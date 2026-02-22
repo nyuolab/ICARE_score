@@ -2,6 +2,29 @@
 
 Quick-test scripts and sample data for the ICARE evaluation pipeline.
 
+## Prerequisites
+
+Before running the pipeline, do the following in order:
+
+**1. Clone the repository:**
+
+```bash
+git clone https://github.com/nyuolab/ICARE_score.git
+cd ICARE_score
+```
+
+**2. Create the conda environment and install dependencies** (run on a compute node with sufficient memory):
+
+```bash
+
+cd ICARE_score  # ensure you're in the cloned repo
+conda create -n rrg-eval-clean python=3.8 -y
+conda activate rrg-eval-clean
+export PYTHONNOUSERSITE=1
+wget -O build-constraints.txt https://raw.githubusercontent.com/explosion/thinc/master/build-constraints.txt
+PIP_CONSTRAINT=./build-constraints.txt pip install -r requirements.txt "pytz" "python-dateutil" "huggingface-hub>=0.14.1" "bottleneck>=1.3.6" --no-cache-dir
+```
+
 ## Sample Data
 
 Uses `test_data/sample_iuxray_reports.csv` — a 10-row sample from the IU X-Ray dataset.
@@ -57,36 +80,22 @@ INPUT: test_data/sample_iuxray_reports.csv
 
 ## Usage
 
-### 1. Create the conda environment
-
-Run on a compute node with sufficient memory:
-
-```bash
-srun --pty --cpus-per-task=8 --gpus=2 --mem=128G --partition=oermannlab bash
-
-cd /path/to/ICARE_score
-conda create -n rrg-eval-clean python=3.8 -y
-conda activate rrg-eval-clean
-export PYTHONNOUSERSITE=1
-wget -O build-constraints.txt https://raw.githubusercontent.com/explosion/thinc/master/build-constraints.txt
-PIP_CONSTRAINT=./build-constraints.txt pip install -r requirements.txt "pytz" "python-dateutil" "huggingface-hub>=0.14.1" "bottleneck>=1.3.6" --no-cache-dir
-```
-
-### 2. Configure `.env`
+### 1. Configure `.env`
 
 Copy `.env.example` to `.env` and set `RRGEVAL_API_KEY`, `RRGEVAL_API_URL`, etc. (see root README).
 
-### 3. Run the eval
+### 2. Run the eval
+
+From the repo root:
 
 ```bash
-cd ICARE_score
 sbatch scripts/example_test/run_eval.sh
 # or: bash scripts/example_test/run_eval.sh
 ```
 
 Results in `test_data/output/`. Uses 5 MCQs per report (instead of 40) for a fast run.
 
-### 4. (Optional) Question categorization
+### 3. (Optional) Question categorization
 
 ```bash
 sbatch scripts/example_test/run_question_categorization.sh
