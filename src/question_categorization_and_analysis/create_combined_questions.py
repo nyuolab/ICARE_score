@@ -3,7 +3,6 @@ import os
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from tqdm import tqdm
 import re
 import argparse
@@ -25,14 +24,54 @@ def parse_arguments():
                         help='List of models (as string representation of list)')
     parser.add_argument('--metrics', type=str, default='["gt_reports_as_ref", "gen_reports_as_ref"]',
                         help='List of metrics (as string representation of list)')
-    parser.add_argument('--base_dir', type=str, 
-                        default='/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed',
-                        help='Base directory for data')
-    parser.add_argument('--output_dir', type=str,
-                        default='/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_summarized_results/IU_xray/question_categorization_and_analysis',
+    parser.add_argument('--base_dir', type=str, default='',
+                        help='Base directory for data (e.g., ${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed). Required unless --flat_base_dir is used.')
+    parser.add_argument('--output_dir', type=str, required=True,
                         help='Output directory for combined data')
+    parser.add_argument('--flat_base_dir', type=str, default='',
+                        help='Flat base dir for test data (structure: flat_base_dir/shuffled_ans_choices_data/{metric}/mcqa_filtering/ and mcqa_eval/). When set, ignores base_dir and uses this simpler structure.')
     
     return parser.parse_args()
+
+def load_and_combine_data_flat(flat_base_dir, metrics):
+    """
+    Load and combine data from flat test-data structure.
+    Expects: flat_base_dir/shuffled_ans_choices_data/{metric}/mcqa_filtering/filtered_questions_shuffled.csv
+             flat_base_dir/shuffled_ans_choices_data/{metric}/mcqa_eval/mcqa_eval_answer_predictions.csv
+    """
+    combined_data = []
+    for metric in metrics:
+        filtered_path = os.path.join(flat_base_dir, "shuffled_ans_choices_data", metric, "mcqa_filtering", "filtered_questions_shuffled.csv")
+        predictions_path = os.path.join(flat_base_dir, "shuffled_ans_choices_data", metric, "mcqa_eval", "mcqa_eval_answer_predictions.csv")
+        if not (os.path.exists(filtered_path) and os.path.exists(predictions_path)):
+            print(f"Missing files for metric={metric}")
+            continue
+        try:
+            questions_df = pd.read_csv(filtered_path)
+            if 'Question_Text' not in questions_df.columns:
+                print(f"Warning: 'Question_Text' not found in {filtered_path}")
+                continue
+            questions_df = questions_df[['Report_ID', 'Question_ID', 'Question_Text']]
+            predictions_df = pd.read_csv(predictions_path)
+            essential_pred_cols = ['Report_ID', 'Question_ID', 'Correct_Answer', 'Predicted_Answer_Using_Gen', 'Predicted_Answer_Using_GT']
+            available_pred_cols = [c for c in essential_pred_cols if c in predictions_df.columns]
+            if len(available_pred_cols) < 3:
+                print(f"Warning: Not enough essential columns in {predictions_path}")
+                continue
+            predictions_df = predictions_df[available_pred_cols]
+            merged_df = pd.merge(questions_df, predictions_df, on=["Report_ID", "Question_ID"], how="inner")
+            merged_df["dataset"] = "example_test"
+            merged_df["model_name"] = "example_test"
+            merged_df["model_seed"] = 1
+            merged_df["eval_seed"] = 123
+            merged_df["metric"] = metric
+            combined_data.append(merged_df)
+        except Exception as e:
+            print(f"Error processing metric={metric}: {e}")
+    if combined_data:
+        return pd.concat(combined_data, ignore_index=True)
+    return None
+
 
 def load_and_combine_data(model_seeds, eval_seeds, datasets, models, metrics, base_dir):
     """
@@ -125,26 +164,35 @@ def main():
     # Parse command line arguments
     args = parse_arguments()
     
-    # Convert string representations to actual lists
-    model_seeds = ast.literal_eval(args.model_seeds)
-    eval_seeds = ast.literal_eval(args.eval_seeds)
-    datasets = ast.literal_eval(args.datasets)
-    models = ast.literal_eval(args.models)
-    metrics = ast.literal_eval(args.metrics)
-    
-    print("Configuration:")
-    print(f"Model seeds: {model_seeds}")
-    print(f"Evaluation seeds: {eval_seeds}")
-    print(f"Datasets: {datasets}")
-    print(f"Models: {models}")
-    print(f"Metrics: {metrics}")
-    print(f"Base directory: {args.base_dir}")
-    print(f"Output directory: {args.output_dir}")
-    print()
-    
-    # Load the combined data
-    print("Loading and combining data...")
-    combined_df = load_and_combine_data(model_seeds, eval_seeds, datasets, models, metrics, args.base_dir)
+    # Flat mode for test data
+    if args.flat_base_dir:
+        metrics = ast.literal_eval(args.metrics)
+        print("Configuration (flat/test mode):")
+        print(f"Flat base directory: {args.flat_base_dir}")
+        print(f"Output directory: {args.output_dir}")
+        print(f"Metrics: {metrics}")
+        print()
+        print("Loading and combining data...")
+        combined_df = load_and_combine_data_flat(args.flat_base_dir, metrics)
+    else:
+        if not args.base_dir:
+            raise ValueError("Either --base_dir or --flat_base_dir must be provided")
+        model_seeds = ast.literal_eval(args.model_seeds)
+        eval_seeds = ast.literal_eval(args.eval_seeds)
+        datasets = ast.literal_eval(args.datasets)
+        models = ast.literal_eval(args.models)
+        metrics = ast.literal_eval(args.metrics)
+        print("Configuration:")
+        print(f"Model seeds: {model_seeds}")
+        print(f"Evaluation seeds: {eval_seeds}")
+        print(f"Datasets: {datasets}")
+        print(f"Models: {models}")
+        print(f"Metrics: {metrics}")
+        print(f"Base directory: {args.base_dir}")
+        print(f"Output directory: {args.output_dir}")
+        print()
+        print("Loading and combining data...")
+        combined_df = load_and_combine_data(model_seeds, eval_seeds, datasets, models, metrics, args.base_dir)
 
     if combined_df is not None:
         print(f"Combined data shape: {combined_df.shape}")

@@ -19,16 +19,18 @@ else
     echo "Warning: .env file not found. Make sure environment variables are set."
 fi
 
-# Load modules
+# Load conda (save/restore cwd since ~/.bashrc may change it)
+ORIG_DIR=$(pwd)
 source ~/.bashrc
-conda activate green
+cd "$ORIG_DIR"
+conda activate rrg-eval-clean
 
 # Set variables
 EVAL_SEED="123"
 MODEL_SEED="1"
 
-# Define paths
-INPUT_DIR="/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed${EVAL_SEED}/IU_xray"
+# Define paths (RRGEVAL_BASE_DATA_PATH is loaded from .env)
+INPUT_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed${EVAL_SEED}/IU_xray"
 
 # Run the script with arguments
 python src/plot_agreement_with_perturbation_stats.py \

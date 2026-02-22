@@ -17,10 +17,12 @@ else
     echo "Warning: .env file not found. Make sure environment variables are set."
 fi
 
-# Load conda
+# Load conda (save/restore cwd since ~/.bashrc may change it)
 # module load anaconda3/gpu/2023.09
+ORIG_DIR=$(pwd)
 source ~/.bashrc
-conda activate green
+cd "$ORIG_DIR"
+conda activate rrg-eval-clean
 
 # EVAL_SEEDS=(123 456 789 101 202)
 EVAL_SEED=123
@@ -29,12 +31,9 @@ export PYTHONHASHSEED=$EVAL_SEED
 SEEDS=(1 2 3 4 5)
 MODEL_SEED=${SEEDS[$SLURM_ARRAY_TASK_ID]}
 
-# Set base directories
-BASE_DIR="path/to/base/directory"
-
-# Define paths
-INPUT_CSV="/gpfs/data/oermannlab/users/rd3571/RRG_models/maira-2/results/iuxray_report_gen_findings_frontal+lateral_seed${MODEL_SEED}_20250107_003058.csv"
-OUTPUT_DIR="/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed${EVAL_SEED}/IU_xray/maira-2/seed_${MODEL_SEED}"
+# Define paths (RRGEVAL_BASE_DATA_PATH is loaded from .env)
+INPUT_CSV="${RRGEVAL_BASE_DATA_PATH}/RRG_models/maira-2/results/iuxray_report_gen_findings_frontal+lateral_seed${MODEL_SEED}_20250107_003058.csv"
+OUTPUT_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed${EVAL_SEED}/IU_xray/maira-2/seed_${MODEL_SEED}"
 
 # Create necessary directories
 mkdir -p "${OUTPUT_DIR}"

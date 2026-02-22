@@ -243,9 +243,8 @@ def main():
                       help='Model seed')
     parser.add_argument('--perturbation_types', type=list, default=["word", "char"],
                       help='Perturbation types to plot')
-    parser.add_argument('--base_dir', type=str, 
-                      default="/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed123/RexValTest",
-                      help='Base directory')
+    parser.add_argument('--base_dir', type=str, required=True,
+                      help='Base directory for evaluation results')
     parser.add_argument('--dataset', type=str, choices=['iuxray', 'rexval'], default='rexval',
                       help='Dataset name to process')
     

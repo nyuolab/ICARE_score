@@ -251,8 +251,8 @@ def plot_report_level_agreement(csv_file: str, output_dir: str, reference: str):
 
 def main():
     parser = argparse.ArgumentParser(description='MCQ Evaluation Script')
-    parser.add_argument('--base_dir', type=str, default='../MCQ_gen_data/RexValTest',
-                      help='Base directory path (default: ../MCQ_gen_data/RexValTest)')
+    parser.add_argument('--base_dir', type=str, required=True,
+                      help='Base directory path for evaluation data')
     parser.add_argument('--data_type', type=str, default='orig_data',
                       help='Type of data (default: orig_data)')
     parser.add_argument('--seed', type=int, default=123,

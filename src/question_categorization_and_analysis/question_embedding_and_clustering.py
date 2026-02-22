@@ -20,13 +20,17 @@ from utils import make_llama_request
 import random
 import argparse
 
-def get_embeddings(questions):
+def get_embeddings(questions, model_path=None):
     """
-    Get embeddings for questions using MedCPT-Query-Encoder
+    Get embeddings for questions using MedCPT-Query-Encoder.
+    model_path: Local path to model (for clusters without Hugging Face access).
+                If None, uses "ncbi/MedCPT-Query-Encoder" from Hugging Face.
+                Pre-download with: git clone https://huggingface.co/ncbi/MedCPT-Query-Encoder
     """
-    print("Loading MedCPT-Query-Encoder model...")
-    model = AutoModel.from_pretrained("ncbi/MedCPT-Query-Encoder")
-    tokenizer = AutoTokenizer.from_pretrained("ncbi/MedCPT-Query-Encoder")
+    model_id = model_path if model_path else "ncbi/MedCPT-Query-Encoder"
+    print(f"Loading MedCPT-Query-Encoder from {model_id}...")
+    model = AutoModel.from_pretrained(model_id, local_files_only=bool(model_path))
+    tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=bool(model_path))
     
     # Process in batches to avoid memory issues
     batch_size = 32
@@ -52,7 +56,15 @@ def get_embeddings(questions):
             
             # Encode the questions (use the [CLS] last hidden states as the representations)
             outputs = model(**encoded)
-            batch_embeddings = outputs.last_hidden_state[:, 0, :].cpu().numpy()
+            # outputs can be:
+            # - a tuple: (last_hidden_state, pooler_output, ...)
+            # - a ModelOutput with .last_hidden_state
+            if hasattr(outputs, "last_hidden_state"):
+                last_hidden = outputs.last_hidden_state
+            else:
+                last_hidden = outputs[0]  # first element is last_hidden_state
+
+            batch_embeddings = last_hidden[:, 0, :].cpu().numpy()
             all_embeddings.append(batch_embeddings)
     
     # Combine all batches
@@ -65,6 +77,7 @@ def cluster_questions(embeddings, unique_questions, n_clusters=20):
     """
     Cluster questions based on embeddings
     """
+    n_clusters = min(n_clusters, len(unique_questions))
     print(f"Clustering questions into {n_clusters} groups...")
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
     cluster_labels = kmeans.fit_predict(embeddings)
@@ -207,7 +220,7 @@ def name_clusters_with_llama(cluster_representatives, output_dir):
         print("Failed to generate cluster names using LLaMA")
         return None
 
-def process_questions(combined_df, output_dir):
+def process_questions(combined_df, output_dir, model_path=None):
     """
     Process questions: generate embeddings, cluster, and name clusters
     """
@@ -224,7 +237,7 @@ def process_questions(combined_df, output_dir):
     else:
         # Get embeddings
         print("Computing embeddings for unique questions...")
-        embeddings = get_embeddings(unique_questions)
+        embeddings = get_embeddings(unique_questions, model_path=model_path)
         # Save embeddings for future use
         with open(embeddings_file, 'wb') as f:
             pickle.dump(embeddings, f)
@@ -278,6 +291,8 @@ def main():
     parser = argparse.ArgumentParser(description="Question Embedding and Clustering")
     parser.add_argument('--output_dir', type=str, required=True, help='Directory to save outputs')
     parser.add_argument('--combined_data_path', type=str, required=True, help='Path to combined_mcqa_data.csv')
+    parser.add_argument('--model_path', type=str, default=None,
+                        help='Local path to MedCPT-Query-Encoder (for clusters without HF access). Pre-download: git clone https://huggingface.co/ncbi/MedCPT-Query-Encoder')
     args = parser.parse_args()
 
     # Set random seeds for reproducibility
@@ -300,7 +315,8 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     # Process questions (embedding, clustering, naming)
-    combined_df, cluster_representatives, cluster_sizes = process_questions(combined_df, output_dir)
+    model_path = args.model_path or os.getenv("MEDCPT_MODEL_PATH")
+    combined_df, cluster_representatives, cluster_sizes = process_questions(combined_df, output_dir, model_path=model_path)
 
     print("\nEmbedding and clustering complete!")
     print("Next steps:")

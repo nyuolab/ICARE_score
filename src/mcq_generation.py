@@ -278,8 +278,8 @@ def process_json_file(input_file, output_file, seed=123):
 
 def main():
     parser = argparse.ArgumentParser(description='Generate and Shuffle MCQs')
-    parser.add_argument('--input_csv', default=os.getenv("RRGEVAL_INPUT_CSV_PATH", "/gpfs/data/oermannlab/users/rd3571/cxr_report_datasets/rexval/RexVal_test_unique_gt_reports.csv"), help='Input CSV file path')
-    parser.add_argument('--output_dir', default=os.getenv("RRGEVAL_OUTPUT_DIR", "/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data/RexValTest"), help='Output directory')
+    parser.add_argument('--input_csv', default=os.getenv("RRGEVAL_INPUT_CSV_PATH", ""), help='Input CSV file path')
+    parser.add_argument('--output_dir', default=os.getenv("RRGEVAL_OUTPUT_DIR", ""), help='Output directory')
     parser.add_argument('--reference', choices=['gt', 'gen'], default='gt', help='Reference type')
     parser.add_argument('--num_questions', type=int, default=40, help='Number of questions per report')
     parser.add_argument('--seed', type=int, default=123, help='Random seed for reproducibility')

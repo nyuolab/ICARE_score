@@ -20,17 +20,19 @@ else
     echo "Warning: .env file not found. Make sure environment variables are set."
 fi
 
-# Load modules
+# Load conda (save/restore cwd since ~/.bashrc may change it)
+ORIG_DIR=$(pwd)
 source ~/.bashrc
-conda activate green
+cd "$ORIG_DIR"
+conda activate rrg-eval-clean
 
 # Set variables
 EVAL_SEED="123"
 MODEL_SEED="1"
 
-# Define paths
-INPUT_CSV="/gpfs/data/oermannlab/users/rd3571/RRG_models/mimic-cxr-findings-baseline/results/iuxray_report_gen_findings_frontal_seed${MODEL_SEED}_20250106_213559.csv"
-OUTPUT_DIR="/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed${EVAL_SEED}/IU_xray/mimic-cxr-findings-baseline/seed_${MODEL_SEED}"
+# Define paths (RRGEVAL_BASE_DATA_PATH is loaded from .env)
+INPUT_CSV="${RRGEVAL_BASE_DATA_PATH}/RRG_models/mimic-cxr-findings-baseline/results/iuxray_report_gen_findings_frontal_seed${MODEL_SEED}_20250106_213559.csv"
+OUTPUT_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed${EVAL_SEED}/IU_xray/mimic-cxr-findings-baseline/seed_${MODEL_SEED}"
 
 # Run the script with arguments
 python src/generate_perturbed_reports.py \

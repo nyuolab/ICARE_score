@@ -9,18 +9,24 @@
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=rd3571@nyu.edu
 
-# Load conda
+# Load environment variables from .env file
+if [ -f ".env" ]; then
+    echo "Loading environment variables from .env file..."
+    export $(cat .env | grep -v '^#' | xargs)
+else
+    echo "Warning: .env file not found. Make sure environment variables are set."
+fi
+
+# Load conda (save/restore cwd since ~/.bashrc may change it)
+ORIG_DIR=$(pwd)
 source ~/.bashrc
-# module load miniconda3/gpu/4.9.2
-conda activate green
+cd "$ORIG_DIR"
+conda activate rrg-eval-clean
 
-
-# Define paths
-OUTPUT_DIR="/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_summarized_results/IU_xray/question_categorization_and_analysis"
+# Define paths (RRGEVAL_BASE_DATA_PATH is loaded from .env)
+OUTPUT_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_summarized_results/IU_xray/question_categorization_and_analysis"
 COMBINED_DATA_PATH="$OUTPUT_DIR/combined_mcqa_data.csv"
 
-# Set the working directory
-cd /gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/RRGEval/src
-python question_categorization_and_analysis/question_embedding_and_clustering.py \
+python src/question_categorization_and_analysis/question_embedding_and_clustering.py \
     --output_dir "$OUTPUT_DIR" \
     --combined_data_path "$COMBINED_DATA_PATH"

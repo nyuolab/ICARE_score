@@ -1,0 +1,27 @@
+# Environment variables (contains secrets and local paths)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Test output
+test_data/output/
+
+# Logs
+logs/
+*.log
+*.out
+*.err
+
+# OS files
+.DS_Store
+Thumbs.db
+

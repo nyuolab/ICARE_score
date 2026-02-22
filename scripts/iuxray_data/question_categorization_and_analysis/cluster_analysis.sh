@@ -9,20 +9,27 @@
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=rd3571@nyu.edu
 
-# Load conda
-module load anaconda3/gpu/2023.09
-conda activate green
+# Load environment variables from .env file
+if [ -f ".env" ]; then
+    echo "Loading environment variables from .env file..."
+    export $(cat .env | grep -v '^#' | xargs)
+else
+    echo "Warning: .env file not found. Make sure environment variables are set."
+fi
 
-# Set the working directory
-cd /gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/RRGEval/src
+# Load conda (save/restore cwd since ~/.bashrc may change it)
+ORIG_DIR=$(pwd)
+source ~/.bashrc
+cd "$ORIG_DIR"
+conda activate rrg-eval-clean
 
-# Define paths
-OUTPUT_DIR="/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_summarized_results/IU_xray/question_categorization_and_analysis"
+# Define paths (RRGEVAL_BASE_DATA_PATH is loaded from .env)
+OUTPUT_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_summarized_results/IU_xray/question_categorization_and_analysis"
 CLUSTERED_DATA_PATH="$OUTPUT_DIR/clustered_questions.csv"
 CLUSTER_NAMES_PATH="$OUTPUT_DIR/cluster_names.json"
 ANALYSIS_FOLDER="$OUTPUT_DIR/analysis"
 
-python question_categorization_and_analysis/cluster_analysis.py \
+python src/question_categorization_and_analysis/cluster_analysis.py \
     --clustered_data_path "$CLUSTERED_DATA_PATH" \
     --cluster_names_path "$CLUSTER_NAMES_PATH" \
     --output_dir "$OUTPUT_DIR" \

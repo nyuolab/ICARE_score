@@ -17,9 +17,11 @@ else
     echo "Warning: .env file not found. Make sure environment variables are set."
 fi
 
-# Load conda
+# Load conda (save/restore cwd since ~/.bashrc may change it)
+ORIG_DIR=$(pwd)
 source ~/.bashrc
-conda activate green
+cd "$ORIG_DIR"
+conda activate rrg-eval-clean
 
 # EVAL_SEEDS=(123 456 789 101 202)
 EVAL_SEED=202
@@ -29,12 +31,9 @@ export PYTHONHASHSEED=$EVAL_SEED
 SEEDS=(1 2 3 4 5)
 MODEL_SEED=${SEEDS[$SLURM_ARRAY_TASK_ID]}
 
-# Set base directories
-BASE_DIR="path/to/base/directory"
-
-# Define paths
-INPUT_CSV="/gpfs/data/oermannlab/users/rd3571/RRG_models/mimic-cxr-findings-baseline/results/iuxray_report_gen_findings_frontal_seed${MODEL_SEED}_20250106_213559.csv"
-OUTPUT_DIR="/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed${EVAL_SEED}/IU_xray/mimic-cxr-findings-baseline/seed_${MODEL_SEED}"
+# Define paths (RRGEVAL_BASE_DATA_PATH is loaded from .env)
+INPUT_CSV="${RRGEVAL_BASE_DATA_PATH}/RRG_models/mimic-cxr-findings-baseline/results/iuxray_report_gen_findings_frontal_seed${MODEL_SEED}_20250106_213559.csv"
+OUTPUT_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed${EVAL_SEED}/IU_xray/mimic-cxr-findings-baseline/seed_${MODEL_SEED}"
 
 # Create necessary directories
 mkdir -p "${OUTPUT_DIR}"
@@ -44,7 +43,7 @@ echo "Processing for MODEL_SEED: ${MODEL_SEED}"
 echo "Generating MCQs..."
 for ref in "gt" "gen" ; do
     python src/mcq_generation.py \
-        --input_csv "/gpfs/data/oermannlab/users/rd3571/RRG_models/mimic-cxr-findings-baseline/results/iuxray_report_gen_findings_frontal_seed${MODEL_SEED}_20250106_213559.csv" \
+        --input_csv "${INPUT_CSV}" \
         --output_dir "${OUTPUT_DIR}" \
         --reference "$ref" \
         --num_questions 40 \

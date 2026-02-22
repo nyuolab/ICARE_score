@@ -4,7 +4,6 @@ import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 from matplotlib.lines import Line2D
 from typing import Dict, Tuple, List, Optional, Union
 from matplotlib.gridspec import GridSpec
@@ -185,7 +184,14 @@ def create_cluster_summary_table_and_scatterplots(gt_model_cluster_results: pd.D
 
     summary_rows = []
     all_models = sorted(gt_model_cluster_results['Model'].unique())
-    models = models_to_plot if models_to_plot else model_order  # Use ordered models instead of all_models
+
+    # Start with desired order, but keep only models that exist in the data
+    candidates = models_to_plot if models_to_plot else model_order
+    models = [m for m in candidates if m in all_models]
+
+    # Fallback: if none of the ordered names match, just plot whatever is in the data
+    if len(models) == 0:
+        models = all_models
 
     # Get cluster name mapping if available
     cluster_name_mapping = {}
@@ -231,6 +237,10 @@ def create_cluster_summary_table_and_scatterplots(gt_model_cluster_results: pd.D
 
         # Create subplot for this model
         df_model = pd.DataFrame([r for r in summary_rows if r['Model'] == model])
+        if df_model.empty:
+            print(f"[WARN] No data for model={model}; skipping plot.")
+            continue
+        
         ax = fig.add_subplot(gs[idx, 0])
         
         # Add subplot label
@@ -256,7 +266,7 @@ def create_cluster_summary_table_and_scatterplots(gt_model_cluster_results: pd.D
         ax.set_ylim(0, 1)
         ax.set_xlabel("ICARE-GEN", fontsize=22, weight='bold', labelpad=15)  # Increased labelpad
         ax.set_ylabel("ICARE-GT", fontsize=22, weight='bold', labelpad=15)  # Increased labelpad
-        ax.set_title(f"{model_display_names[model]}", 
+        ax.set_title(f"{model_display_names.get(model, model)}", 
                     fontsize=24, weight='bold', pad=20)
         ax.grid(True)
         
