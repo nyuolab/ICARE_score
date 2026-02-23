@@ -1,6 +1,0 @@
-Index,Report_ID,Question_ID,Question_Text,Options,Predicted_Answer_with_report,Correct_Answer,Predicted_Answer_without_report
-23,4,3,Is there any evidence of pleural effusion in the radiology report?,"{'A': 'No, no pleural effusion is present', 'B': 'No definite pleural effusion', 'C': 'Yes, a small pleural effusion is present', 'D': 'Yes, a large pleural effusion is present'}",D,B,C
-39,7,4,"What is described as normal in the radiology report, although the specific term is redacted?","{'A': 'XXXX', 'B': 'Cardiomediastinal silhouette', 'C': 'Lung fields', 'D': 'Diaphragm'}",C,A,B
-40,8,0,What is the status of the cardiomegaly in the radiology report?,"{'A': 'Unknown', 'B': 'Stable', 'C': 'Decreased', 'D': 'Increased'}",C,B,A
-42,8,2,What is the status of the aeration of the lung bases?,"{'A': 'Unchanged', 'B': 'Severely impaired', 'C': 'Decreased', 'D': 'Improved'}",C,D,A
-45,9,0,What is the status of the left pleural effusion as mentioned in the radiology report?,"{'A': 'It has increased in size', 'B': 'It has resolved', 'C': 'It is not mentioned', 'D': 'It remains unchanged'}",C,B,B

@@ -1,8 +1,0 @@
-Cluster,Agreement_Min,Agreement_Max,Agreement_Avg,Cluster_Name
-3,0,0,0,Right Base Density Status
-8,0,0,0,Catheter Visualization
-11,0,0,0,Cardiomegaly Status
-13,0,0,0,Lung Base Aeration
-2,1,1,1,Upper Abdomen Findings
-9,1,1,1,Lung Status Assessment
-15,1,1,1,Pleural Effusion Evidence
