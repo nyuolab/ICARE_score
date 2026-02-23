@@ -1,0 +1,6 @@
+Index,Report_ID,Question_ID,Correct_Answer,Predicted_Answer_Using_GT,Predicted_Answer_Using_Gen,Options
+0,4,3,B,B,A,"{'A': 'No, no pleural effusion is present', 'B': 'No definite pleural effusion', 'C': 'Yes, a small pleural effusion is present', 'D': 'Yes, a large pleural effusion is present'}"
+1,7,4,A,B,B,"{'A': 'XXXX', 'B': 'Cardiomediastinal silhouette', 'C': 'Lung fields', 'D': 'Diaphragm'}"
+2,8,0,B,B,B,"{'A': 'Unknown', 'B': 'Stable', 'C': 'Decreased', 'D': 'Increased'}"
+3,8,2,D,D,C,"{'A': 'Unchanged', 'B': 'Severely impaired', 'C': 'Decreased', 'D': 'Improved'}"
+4,9,0,B,B,C,"{'A': 'It has increased in size', 'B': 'It has resolved', 'C': 'It is not mentioned', 'D': 'It remains unchanged'}"

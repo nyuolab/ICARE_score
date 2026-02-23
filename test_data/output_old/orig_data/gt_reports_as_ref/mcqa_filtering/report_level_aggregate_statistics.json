@@ -1,0 +1,27 @@
+{
+  "Total_Reports": 10,
+  "Questions_Per_Report": {
+    "Mean": 5.0,
+    "Std": 0.0
+  },
+  "Report_Dependent_Questions": {
+    "Mean_Count": 0.5,
+    "Std_Count": 0.6708203932499369,
+    "Mean_Percentage": 10.0,
+    "Std_Percentage": 13.416407864998739
+  },
+  "Accuracy_Stats": {
+    "With_Report": {
+      "Mean": 100.0,
+      "Std": 0.0
+    },
+    "Without_Report": {
+      "Mean": 90.0,
+      "Std": 13.416407864998739
+    },
+    "Difference": {
+      "Mean": 10.0,
+      "Std": 13.416407864998739
+    }
+  }
+}

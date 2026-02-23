@@ -1,0 +1,7 @@
+{
+  "Total_Questions": 50,
+  "Dataset_Accuracy_With_Report": 96.0,
+  "Dataset_Accuracy_Without_Report": 72.0,
+  "Report_Dependent_Questions_count": 12,
+  "Report_Dependent_Questions_percentage": 24.0
+}

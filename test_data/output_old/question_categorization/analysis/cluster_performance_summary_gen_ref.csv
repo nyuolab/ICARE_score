@@ -1,0 +1,11 @@
+Cluster,Agreement_Min,Agreement_Max,Agreement_Avg,Cluster_Name
+0,0,0,0,Aortic Condition Assessment
+6,0,0,0,Atelectasis Location
+7,0,0,0,Left Lung Condition
+10,0,0,0,Lung Lobe Involvement
+12,0,0,0,Right Upper Quadrant Findings
+14,0,0,0,Lung Inflation Status
+16,0,0,0,Lung Condition Assessment
+1,1,1,1,Lung Condition Overview
+4,1,1,1,Jugular Vein Catheter Type
+5,1,1,1,Pneumothorax Evidence

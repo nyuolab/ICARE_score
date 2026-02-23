@@ -71,7 +71,7 @@ def get_model_prediction(
         max_tokens=max_tokens, 
         temperature=temperature, 
         timeout=timeout,
-        model="llama3-3-70b-chat",
+        model=Config.MODEL_NAME,
         seed=seed,
         top_p=top_p,
         n=n,

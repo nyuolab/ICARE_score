@@ -114,7 +114,7 @@ def parse_mcq(mcq_text):
 
 def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
     api_key=Config.API_KEY, timeout=Config.GENERATION_TIMEOUT, max_tokens=Config.GENERATION_MAX_TOKENS, 
-    temperature=Config.DEFAULT_TEMPERATURE, top_p=Config.DEFAULT_TOP_P, n=Config.DEFAULT_N, seed=Config.DEFAULT_SEED):
+    temperature=Config.DEFAULT_TEMPERATURE, top_p=Config.DEFAULT_TOP_P, n=Config.DEFAULT_N, seed=Config.DEFAULT_SEED, model_name=Config.MODEL_NAME):
     """Generate MCQs for given reports and write them to file."""
     """Generate MCQs for given reports and write them to file."""
     try:
@@ -157,7 +157,7 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
                             max_tokens=max_tokens,
                             temperature=temperature,
                             timeout=timeout,
-                            model="llama3-3-70b-chat",
+                            model=model_name,
                             seed=seed,
                             top_p=top_p,
                             n=n,
@@ -321,7 +321,8 @@ def main():
         temperature=Config.DEFAULT_TEMPERATURE,
         top_p=Config.DEFAULT_TOP_P,
         n=Config.DEFAULT_N,
-        seed=seed
+        seed=seed,
+        model_name=Config.MODEL_NAME
     )
     
     print(f"MCQs saved to {json_output_file}")

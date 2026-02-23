@@ -18,7 +18,7 @@ class Config:
     API_URL: str = os.getenv("RRGEVAL_API_URL", "http://your_api_url_here")
 
     # Model Configuration
-    MODEL_NAME: str = os.getenv("RRGEVAL_MODEL_NAME", "llama3-3-70b-chat")
+    MODEL_NAME: str = os.getenv("RRGEVAL_MODEL_NAME", "llama-3-3-70b-chat")
 
     # Default parameters
     DEFAULT_MAX_TOKENS: int = int(os.getenv("RRGEVAL_MAX_TOKENS", "10000"))

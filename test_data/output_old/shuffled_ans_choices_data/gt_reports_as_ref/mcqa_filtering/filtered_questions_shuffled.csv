@@ -1,0 +1,8 @@
+Index,Report_ID,Question_ID,Question_Text,Options,Predicted_Answer_with_report,Correct_Answer,Predicted_Answer_without_report
+6,1,1,What is the status of the lungs according to the radiology report?,"{'A': 'Partially obscured', 'B': 'Completely opaque', 'C': 'Cloudy with multiple nodules', 'D': 'Clear'}",A,D,B
+13,2,3,Is there any evidence of pleural effusion in the radiology report?,"{'A': 'Yes, a large pleural effusion is present', 'B': 'No, there is no pleural effusion', 'C': 'Yes, a small pleural effusion is present', 'D': 'Maybe, the report is unclear'}",A,B,B
+40,8,0,What is the status of the cardiomegaly in the radiology report?,"{'A': 'Stable', 'B': 'Unknown', 'C': 'Decreased', 'D': 'Increased'}",D,A,A
+42,8,2,What is the status of the aeration of the lung bases?,"{'A': 'Improved', 'B': 'Severely impaired', 'C': 'Decreased', 'D': 'Unchanged'}",B,A,A
+44,8,4,What type of catheter is visualized in the radiology report?,"{'A': 'Tunneled dialysis catheter', 'B': 'Arterial catheter', 'C': 'Peripheral intravenous catheter', 'D': 'Non-tunneled central venous catheter'}",A,A,B
+47,9,2,What is noted in the upper right abdomen immediately below the right hemidiaphragm?,"{'A': 'An air-fluid level', 'B': 'Free air', 'C': 'A solid mass', 'D': 'A cyst'}",D,A,C
+49,9,4,What is the status of the right base densities as compared to previous observations?,"{'A': 'They have worsened', 'B': 'They are unchanged', 'C': 'They appear improved', 'D': 'They are not mentioned'}",A,C,B

@@ -1,0 +1,12 @@
+Index,Report_ID,Question_ID,Question_Text,Options,Predicted_Answer_with_report,Correct_Answer,Predicted_Answer_without_report
+4,0,4,What is the overall impression of the lung condition from the radiology report?,"{'A': 'Abnormal with multiple issues', 'B': 'Normal with no issues', 'C': 'Partially abnormal with some issues', 'D': 'Unclear due to lack of information'}",B,B,A
+9,1,4,What is the overall impression of the lung condition from the radiology report?,"{'A': 'Abnormal with multiple issues', 'B': 'Normal with no issues', 'C': 'Partially abnormal with some issues', 'D': 'Unclear due to lack of information'}",B,B,A
+14,2,4,What is the overall impression of the lung condition from the radiology report?,"{'A': 'Abnormal with multiple issues', 'B': 'Normal with no issues', 'C': 'Partially abnormal with some issues', 'D': 'Unclear due to lack of information'}",B,B,A
+20,4,0,"What is the condition of the lungs in terms of inflation, according to the radiology report?","{'A': 'Underinflated', 'B': 'Overinflated', 'C': 'Adequately inflated', 'D': 'Not mentioned'}",C,C,D
+21,4,1,"Which of the following conditions is NOT present in the patient, based on the radiology report?","{'A': 'Pleural effusion', 'B': 'Pneumothorax', 'C': 'Hiatal hernia', 'D': 'Degenerative spine changes'}",A,A,B
+25,5,0,What is the condition of the lungs according to the radiology report?,"{'A': 'Hyperinflated', 'B': 'Normally inflated', 'C': 'Hypoinflated', 'D': 'Overinflated'}",C,C,A
+31,6,1,Which of the following is NOT mentioned as being present in the report?,"{'A': 'Focal airspace opacity', 'B': 'Pleural effusion', 'C': 'Pneumothorax', 'D': 'All of the above'}",D,D,C
+37,7,2,In which lobe of the lung is patchy airspace disease observed?,"{'A': 'Left upper lobe', 'B': 'Right lower lobe', 'C': 'Left lower lobe', 'D': 'Right upper lobe'}",B,B,D
+44,8,4,What type of catheter is present in the right internal jugular vein?,"{'A': 'Single-lumen catheter', 'B': 'Double-lumen catheter', 'C': 'PICC line', 'D': 'Central venous catheter'}",B,B,D
+46,9,1,What is the location of the atelectasis noted in the radiology report?,"{'A': 'Left lung base', 'B': 'Right lung base', 'C': 'Bilateral lung bases', 'D': 'Apical regions of both lungs'}",B,B,C
+49,9,4,What are noted in the left upper quadrant of the radiology report?,"{'A': 'Surgical staples', 'B': 'Surgical clips', 'C': 'Foreign body', 'D': 'Calcification'}",B,B,A

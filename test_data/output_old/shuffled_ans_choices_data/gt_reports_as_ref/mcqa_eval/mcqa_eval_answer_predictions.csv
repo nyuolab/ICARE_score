@@ -1,0 +1,8 @@
+Index,Report_ID,Question_ID,Correct_Answer,Predicted_Answer_Using_GT,Predicted_Answer_Using_Gen,Options
+0,1,1,D,D,D,"{'A': 'Partially obscured', 'B': 'Completely opaque', 'C': 'Cloudy with multiple nodules', 'D': 'Clear'}"
+1,2,3,B,B,B,"{'A': 'Yes, a large pleural effusion is present', 'B': 'No, there is no pleural effusion', 'C': 'Yes, a small pleural effusion is present', 'D': 'Maybe, the report is unclear'}"
+2,8,0,A,A,B,"{'A': 'Stable', 'B': 'Unknown', 'C': 'Decreased', 'D': 'Increased'}"
+3,8,2,A,A,C,"{'A': 'Improved', 'B': 'Severely impaired', 'C': 'Decreased', 'D': 'Unchanged'}"
+4,8,4,A,A,D,"{'A': 'Tunneled dialysis catheter', 'B': 'Arterial catheter', 'C': 'Peripheral intravenous catheter', 'D': 'Non-tunneled central venous catheter'}"
+5,9,2,A,A,A,"{'A': 'An air-fluid level', 'B': 'Free air', 'C': 'A solid mass', 'D': 'A cyst'}"
+6,9,4,C,C,D,"{'A': 'They have worsened', 'B': 'They are unchanged', 'C': 'They appear improved', 'D': 'They are not mentioned'}"

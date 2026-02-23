@@ -1,0 +1,8 @@
+Model,Cluster,Agreement,Count,Cluster_Name
+example_test,2,1,1,Upper Abdomen Findings
+example_test,3,0,1,Right Base Density Status
+example_test,8,0,1,Catheter Visualization
+example_test,9,1,1,Lung Status Assessment
+example_test,11,0,1,Cardiomegaly Status
+example_test,13,0,1,Lung Base Aeration
+example_test,15,1,1,Pleural Effusion Evidence
