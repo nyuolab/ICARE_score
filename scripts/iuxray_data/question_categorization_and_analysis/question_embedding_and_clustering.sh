@@ -24,7 +24,7 @@ cd "$ORIG_DIR"
 conda activate rrg-eval-clean
 
 # Define paths (RRGEVAL_BASE_DATA_PATH is loaded from .env)
-OUTPUT_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_summarized_results/IU_xray/question_categorization_and_analysis"
+OUTPUT_DIR="${ORIG_DIR}/outputs/IU_xray/_summary/question_categorization_and_analysis"
 COMBINED_DATA_PATH="$OUTPUT_DIR/combined_mcqa_data.csv"
 
 python src/question_categorization_and_analysis/question_embedding_and_clustering.py \

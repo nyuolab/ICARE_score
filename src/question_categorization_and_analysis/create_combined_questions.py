@@ -25,7 +25,7 @@ def parse_arguments():
     parser.add_argument('--metrics', type=str, default='["gt_reports_as_ref", "gen_reports_as_ref"]',
                         help='List of metrics (as string representation of list)')
     parser.add_argument('--base_dir', type=str, default='',
-                        help='Base directory for data (e.g., ${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed). Required unless --flat_base_dir is used.')
+                        help='Base outputs directory containing <dataset>/<model>/eval_seed_<seed>/ (e.g., ./outputs). Required unless --flat_base_dir is used.')
     parser.add_argument('--output_dir', type=str, required=True,
                         help='Output directory for combined data')
     parser.add_argument('--flat_base_dir', type=str, default='',
@@ -87,19 +87,21 @@ def load_and_combine_data(model_seeds, eval_seeds, datasets, models, metrics, ba
                     for metric in metrics:  # Added loop for metrics
                         # Path to filtered questions
                         filtered_questions_path = os.path.join(
-                            base_dir + str(eval_seed),
+                            base_dir,
                             dataset,
                             model,
-                            f"seed_{model_seed}",
+                            f"model_seed_{model_seed}",
+                            f"eval_seed_{eval_seed}",
                             f"shuffled_ans_choices_data/{metric}/mcqa_filtering/filtered_questions_shuffled.csv"
                         )
                         
                         # Path to answer predictions
                         predictions_path = os.path.join(
-                            base_dir + str(eval_seed),
+                            base_dir,
                             dataset,
                             model,
-                            f"seed_{model_seed}",
+                            f"model_seed_{model_seed}",
+                            f"eval_seed_{eval_seed}",
                             f"shuffled_ans_choices_data/{metric}/mcqa_eval/mcqa_eval_answer_predictions.csv"
                         )
                         

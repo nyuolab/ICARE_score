@@ -293,9 +293,9 @@ def main():
         else:  # dataset == 'iuxray'
             # Original code for IU-Xray with multiple models and seeds
             models = {
-                'maira-2': [f'seed_{model_seed}'],
-                'chexpert-mimic-cxr-findings-baseline': [f'seed_{model_seed}'],
-                'mimic-cxr-findings-baseline': [f'seed_{model_seed}'],
+                'maira-2': [f'model_seed_{model_seed}/eval_seed_{eval_seed}'],
+                'chexpert-mimic-cxr-findings-baseline': [f'model_seed_{model_seed}/eval_seed_{eval_seed}'],
+                'mimic-cxr-findings-baseline': [f'model_seed_{model_seed}/eval_seed_{eval_seed}'],
             }
             
             for model, seeds in models.items():
@@ -332,7 +332,7 @@ def main():
         
         output_path = os.path.join(base_dir, f"plots/perturbation_{perturbation_type}_level")
         if dataset == 'iuxray':
-            output_path = os.path.join(output_path, f"seed_{model_seed}")
+            output_path = os.path.join(output_path, f"model_seed_{model_seed}", f"eval_seed_{eval_seed}")
             
         # Create all plots
         create_separate_plots(data_dict, output_dir=output_path)

@@ -30,7 +30,7 @@ EVAL_SEED="123"
 MODEL_SEED="1"
 
 # Define paths (RRGEVAL_BASE_DATA_PATH is loaded from .env)
-INPUT_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed${EVAL_SEED}/IU_xray"
+INPUT_DIR="${ORIG_DIR}/outputs/IU_xray"
 
 # Run the script with arguments
 python src/plot_agreement_with_perturbation_stats.py \

@@ -15,6 +15,9 @@ build/
 # Test output
 test_data/output/
 
+# Local pipeline outputs (written to ./outputs/ by scripts/iuxray_data/*.sh)
+outputs/
+
 # Logs
 logs/
 *.log

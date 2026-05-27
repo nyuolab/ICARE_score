@@ -31,8 +31,8 @@ MODELS='["chexpert-mimic-cxr-findings-baseline", "mimic-cxr-findings-baseline", 
 METRICS='["gt_reports_as_ref", "gen_reports_as_ref"]'
 
 # Define paths (RRGEVAL_BASE_DATA_PATH is loaded from .env)
-BASE_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed"
-OUTPUT_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_summarized_results/IU_xray/question_categorization_and_analysis"
+BASE_DIR="${ORIG_DIR}/outputs"
+OUTPUT_DIR="${ORIG_DIR}/outputs/IU_xray/_summary/question_categorization_and_analysis"
 
 # Run the Python script with command-line arguments
 python src/question_categorization_and_analysis/create_combined_questions.py \

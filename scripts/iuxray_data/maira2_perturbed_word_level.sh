@@ -32,7 +32,7 @@ MODEL_SEED="1"
 
 # Define paths (RRGEVAL_BASE_DATA_PATH is loaded from .env)
 INPUT_CSV="${RRGEVAL_BASE_DATA_PATH}/RRG_models/maira-2/results/iuxray_report_gen_findings_frontal+lateral_seed${MODEL_SEED}_20250107_003058.csv"
-OUTPUT_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed${EVAL_SEED}/IU_xray/maira-2/seed_${MODEL_SEED}"
+OUTPUT_DIR="${ORIG_DIR}/outputs/IU_xray/maira-2/model_seed_${MODEL_SEED}/eval_seed_${EVAL_SEED}"
 
 # Run the script with arguments
 python src/generate_perturbed_reports.py \

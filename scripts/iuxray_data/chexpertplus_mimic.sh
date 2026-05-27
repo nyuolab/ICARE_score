@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=mimic_%a
-#SBATCH --partition=oermannlab
+#SBATCH --partition=gpu4_medium
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=128G
@@ -23,23 +23,24 @@ source ~/.bashrc
 cd "$ORIG_DIR"
 conda activate rrg-eval-clean
 
-# EVAL_SEEDS=(123 456 789 101 202)
-EVAL_SEED=202
-export PYTHONHASHSEED=$EVAL_SEED
+# MODEL_SEED: single value per submission. Change it (1-5) and resubmit to run
+# other model seeds. EVAL_SEED is swept across the SLURM array tasks below.
+MODEL_SEED=1
 
-# Define array of seeds
-SEEDS=(1 2 3 4 5)
-MODEL_SEED=${SEEDS[$SLURM_ARRAY_TASK_ID]}
+# Each array task evaluates one eval seed; all 5 run simultaneously.
+EVAL_SEEDS=(123 456 789 202 101)
+EVAL_SEED=${EVAL_SEEDS[$SLURM_ARRAY_TASK_ID]}
+export PYTHONHASHSEED=$EVAL_SEED
 
 # Define paths (RRGEVAL_BASE_DATA_PATH is loaded from .env)
 INPUT_CSV="${RRGEVAL_BASE_DATA_PATH}/RRG_models/mimic-cxr-findings-baseline/results/iuxray_report_gen_findings_frontal_seed${MODEL_SEED}_20250106_213559.csv"
-OUTPUT_DIR="${RRGEVAL_BASE_DATA_PATH}/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_seed${EVAL_SEED}/IU_xray/mimic-cxr-findings-baseline/seed_${MODEL_SEED}"
+OUTPUT_DIR="${ORIG_DIR}/outputs/IU_xray/mimic-cxr-findings-baseline/model_seed_${MODEL_SEED}/eval_seed_${EVAL_SEED}"
 
 # Create necessary directories
 mkdir -p "${OUTPUT_DIR}"
 
 # Step 2: Generate MCQs for both GT and Gen reports
-echo "Processing for MODEL_SEED: ${MODEL_SEED}"
+echo "Processing EVAL_SEED: ${EVAL_SEED} (model report seed fixed at ${MODEL_SEED})"
 echo "Generating MCQs..."
 for ref in "gt" "gen" ; do
     python src/mcq_generation.py \
@@ -77,8 +78,8 @@ for data_type in "orig_data" "shuffled_ans_choices_data"; do
         --gt_report_csv_file "$INPUT_CSV"
 done
 
-echo "Pipeline completed successfully for MODEL_SEED: ${MODEL_SEED}!"
+echo "Pipeline completed successfully for EVAL_SEED: ${EVAL_SEED}!"
 
 # Print summary of generated files
-echo -e "\nGenerated files structure for MODEL_SEED ${MODEL_SEED}:"
+echo -e "\nGenerated files structure for EVAL_SEED ${EVAL_SEED}:"
 tree "${OUTPUT_DIR}" -L 4
