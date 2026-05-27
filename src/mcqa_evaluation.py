@@ -80,6 +80,60 @@ def get_model_prediction(
     )
 
 
+def predict_answers_for_predefined_mcq_data(
+    ques_csv_file: str,
+    gen_report_csv_file: str,
+    gt_report_csv_file: str,
+    output_csv_file: str,
+    seed: int = 123
+) -> List[Dict]:
+    """
+    Apply a fixed question bank to every report pair.
+    The questions CSV has one row per question (no Report_ID column).
+    The output CSV has num_reports × num_questions rows.
+    """
+    ques_df = pd.read_csv(ques_csv_file)
+    gen_report_df = pd.read_csv(gen_report_csv_file)
+    gt_report_df = pd.read_csv(gt_report_csv_file)
+
+    csv_headers = ['Index', 'Report_ID', 'Question_ID', 'Category', 'Correct_Answer',
+                   'Predicted_Answer_Using_GT', 'Predicted_Answer_Using_Gen', 'Options']
+    csvfile = open(output_csv_file, 'w', newline='')
+    csv_writer = csv.DictWriter(csvfile, fieldnames=csv_headers)
+    csv_writer.writeheader()
+
+    results = []
+    idx = 0
+    num_reports = len(gt_report_df)
+
+    for report_id in tqdm(range(num_reports), desc="Reports"):
+        gt_report = gt_report_df['ground_truth_report'][report_id]
+        gen_report = gen_report_df['generated_report'][report_id]
+
+        for _, row in ques_df.iterrows():
+            options = eval(row['Options'])
+            predicted_gt = get_model_prediction(gt_report, row['Question_Text'], options, "using_report", seed=seed)
+            predicted_gen = get_model_prediction(gen_report, row['Question_Text'], options, "using_report", seed=seed)
+
+            result = {
+                'Index': idx,
+                'Report_ID': report_id,
+                'Question_ID': row['Question_ID'],
+                'Category': row.get('Category', ''),
+                'Correct_Answer': row['Correct_Answer'],
+                'Predicted_Answer_Using_GT': predicted_gt,
+                'Predicted_Answer_Using_Gen': predicted_gen,
+                'Options': options,
+            }
+            results.append(result)
+            csv_writer.writerow(result)
+            csvfile.flush()
+            idx += 1
+
+    csvfile.close()
+    return results
+
+
 def predict_answers_for_mcq_data(
     ques_csv_file: str,
     gen_report_csv_file: str,
@@ -267,16 +321,57 @@ def main():
                       help='Perturbation degree (default: 0)')
     parser.add_argument('--perturbation_type', type=str, default='char',
                       help='Perturbation type (default: char)')
-    
+    parser.add_argument('--predefined_ques_csv', type=str, default='',
+                      help='Path to predefined questions CSV; skips gt/gen question-source loop and runs evaluation once')
+
     args = parser.parse_args()
-    
+
     base_directory = args.base_dir
     data_type = args.data_type
     seed = args.seed
-    
+
     os.makedirs(base_directory, exist_ok=True)
-    
-    # Process both gt and gen references
+
+    # ------------------------------------------------------------------
+    # Predefined-questions path: single evaluation run, no gt/gen split
+    # ------------------------------------------------------------------
+    if args.predefined_ques_csv:
+        output_dir = os.path.join(base_directory, 'mcqa_eval')
+        os.makedirs(output_dir, exist_ok=True)
+
+        mcqa_eval_ans_predictions_output_csv_file = os.path.join(output_dir, 'mcqa_eval_answer_predictions.csv')
+
+        print(f"\nRunning predefined-questions evaluation...")
+        print(f"  Questions CSV : {args.predefined_ques_csv}")
+        print(f"  GT reports    : {args.gt_report_csv_file}")
+        print(f"  Gen reports   : {args.gen_report_csv_file}")
+
+        predict_answers_for_predefined_mcq_data(
+            args.predefined_ques_csv,
+            args.gen_report_csv_file,
+            args.gt_report_csv_file,
+            mcqa_eval_ans_predictions_output_csv_file,
+            seed=seed
+        )
+        print(f"Results saved to {mcqa_eval_ans_predictions_output_csv_file}")
+
+        agreement_stats = calculate_dataset_level_agreement(mcqa_eval_ans_predictions_output_csv_file)
+        if agreement_stats:
+            print(f"\nDataset-level statistics:")
+            print(f"Total questions: {agreement_stats['total_questions']}")
+            print(f"Agreement: {agreement_stats['agreement_percentage']}%")
+            print(f"Disagreement: {agreement_stats['disagreement_percentage']}%")
+
+            stats_file = os.path.join(output_dir, 'mcq_eval_dataset_level_agreement_stats.csv')
+            pd.DataFrame([agreement_stats]).to_csv(stats_file, index=False)
+            print(f"Agreement statistics saved to {stats_file}")
+
+        plot_report_level_agreement(mcqa_eval_ans_predictions_output_csv_file, output_dir, 'predefined')
+        return
+
+    # ------------------------------------------------------------------
+    # Dynamic-questions path: loop over gt/gen question sources
+    # ------------------------------------------------------------------
     for ques_reference in ['gen', 'gt']:
         if args.perturbation == "perturbed":
             if ques_reference == "gt":
@@ -291,18 +386,18 @@ def main():
             gen_report_csv_file = args.gen_report_csv_file
             gt_report_csv_file = args.gt_report_csv_file
             output_dir = os.path.join(base_directory, data_type, f'{ques_reference}_reports_as_ref', 'mcqa_eval')
-        
+
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Input files
         ques_csv_file = os.path.join(base_directory, data_type,
                                    f'{ques_reference}_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv')
-        
+
         # Output file
         mcqa_eval_ans_predictions_output_csv_file = os.path.join(output_dir, f"mcqa_eval_answer_predictions.csv")
-        
+
         print(f"\nProcessing MCQ evaluation for {ques_reference} reference...")
-        results = predict_answers_for_mcq_data( 
+        results = predict_answers_for_mcq_data(
             ques_csv_file,
             gen_report_csv_file,
             gt_report_csv_file,
@@ -310,7 +405,7 @@ def main():
             seed=seed
         )
         print(f"Results saved to {mcqa_eval_ans_predictions_output_csv_file}")
-        
+
         # Calculate dataset-level agreement
         agreement_stats = calculate_dataset_level_agreement(mcqa_eval_ans_predictions_output_csv_file)
         if agreement_stats:
@@ -318,12 +413,12 @@ def main():
             print(f"Total questions: {agreement_stats['total_questions']}")
             print(f"Agreement: {agreement_stats['agreement_percentage']}%")
             print(f"Disagreement: {agreement_stats['disagreement_percentage']}%")
-            
+
             # Save agreement stats
             stats_file = os.path.join(output_dir, f'mcq_eval_dataset_level_agreement_stats.csv')
             pd.DataFrame([agreement_stats]).to_csv(stats_file, index=False)
             print(f"Agreement statistics saved to {stats_file}")
-        
+
         # Generate report-level analysis
         plot_report_level_agreement(mcqa_eval_ans_predictions_output_csv_file, output_dir, ques_reference)
 
