@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=icare_rexval_predefined
-#SBATCH --partition=oermannlab
+#SBATCH --job-name=icare_radpref_predefined
+#SBATCH --partition=gpu8_long
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=128G
@@ -9,14 +9,14 @@
 #SBATCH --mail-user=rd3571@nyu.edu
 
 # =============================================================================
-# Run ICARE on RexVal using a predefined (fixed) question list.
+# Run ICARE on RadPref using a predefined (fixed) question list.
 # Skips MCQ generation and filtering; runs evaluation once.
 #
 # Usage:
 #   cd ICARE_score
-#   sbatch scripts/rexval_data/rexval_predefined.sh
+#   sbatch scripts/radpref_data/icare_radpref_predefined.sh
 #   # or local run:
-#   bash scripts/rexval_data/rexval_predefined.sh
+#   bash scripts/radpref_data/icare_radpref_predefined.sh
 # =============================================================================
 
 set -eo pipefail
@@ -47,23 +47,41 @@ BASE_DATA_PATH="${RRGEVAL_BASE_DATA_PATH:-/gpfs/data/oermannlab/users/rd3571}"
 PREDEFINED_JSON="${PREDEFINED_JSON:-${ORIG_DIR}/outputs/predefined_ques_list/mcqa_data.json}"
 PREDEFINED_CSV="${PREDEFINED_CSV:-${ORIG_DIR}/outputs/predefined_ques_list/predefined_questions.csv}"
 
-REPORT_CSV="${REPORT_CSV:-${BASE_DATA_PATH}/cxr_report_datasets/rexval/RexVal_test_icare_200.csv}"
-OUTPUT_DIR="${OUTPUT_DIR:-${ORIG_DIR}/outputs/rexval/predefined/eval_seed_${EVAL_SEED}}"
+RAW_INPUT_JSON="${RAW_INPUT_JSON:-${BASE_DATA_PATH}/CRIMSON/RadPref/preference_data.json}"
+NORMALIZED_INPUT_CSV="${NORMALIZED_INPUT_CSV:-${BASE_DATA_PATH}/cxr_report_datasets/radpref/radpref_icare.csv}"
+OUTPUT_DIR="${OUTPUT_DIR:-${ORIG_DIR}/outputs/radpref/predefined/eval_seed_${EVAL_SEED}}"
 
 export PYTHONHASHSEED="${EVAL_SEED}"
 
 echo "============================================="
-echo "  ICARE Score - RexVal (predefined questions)"
+echo "  ICARE Score - RadPref (predefined questions)"
 echo "============================================="
 echo "Predefined JSON : ${PREDEFINED_JSON}"
 echo "Predefined CSV  : ${PREDEFINED_CSV}"
-echo "Report CSV      : ${REPORT_CSV}"
+echo "Raw input JSON  : ${RAW_INPUT_JSON}"
+echo "Prepared CSV    : ${NORMALIZED_INPUT_CSV}"
 echo "Output dir      : ${OUTPUT_DIR}"
 echo "Eval seed       : ${EVAL_SEED}"
 echo "============================================="
 echo ""
 
 mkdir -p "${OUTPUT_DIR}"
+mkdir -p "$(dirname "${NORMALIZED_INPUT_CSV}")"
+
+# -----------------------------------------------------------------------------
+# Step 0: Convert RadPref JSON → ICARE-ready CSV
+# (skipped if CSV already exists)
+# -----------------------------------------------------------------------------
+if [ ! -f "${NORMALIZED_INPUT_CSV}" ]; then
+    echo ">>> Step 0: Preparing RadPref input..."
+    python scripts/radpref_data/prepare_radpref_for_icare.py \
+        --input_json "${RAW_INPUT_JSON}" \
+        --output_csv "${NORMALIZED_INPUT_CSV}"
+    echo ">>> Step 0 complete."
+else
+    echo ">>> Step 0: Prepared CSV already exists, skipping."
+fi
+echo ""
 
 # -----------------------------------------------------------------------------
 # Step 1: Convert predefined mcqa_data.json → predefined_questions.csv
@@ -87,14 +105,14 @@ echo ">>> Step 2: Running MCQA evaluation..."
 python src/mcqa_evaluation.py \
     --base_dir "${OUTPUT_DIR}" \
     --seed "${EVAL_SEED}" \
-    --gen_report_csv_file "${REPORT_CSV}" \
-    --gt_report_csv_file "${REPORT_CSV}" \
+    --gen_report_csv_file "${NORMALIZED_INPUT_CSV}" \
+    --gt_report_csv_file "${NORMALIZED_INPUT_CSV}" \
     --predefined_ques_csv "${PREDEFINED_CSV}"
 echo ">>> Step 2 complete."
 
 echo ""
 echo "============================================="
-echo "  Predefined ICARE pipeline completed."
+echo "  Predefined RadPref ICARE pipeline completed."
 echo "============================================="
 echo "Key output files:"
 echo "  ${OUTPUT_DIR}/mcqa_eval/mcqa_eval_answer_predictions.csv"

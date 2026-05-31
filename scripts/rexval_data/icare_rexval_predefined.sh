@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=icare_iuxray_predefined_%a
+#SBATCH --job-name=icare_rexval_predefined
 #SBATCH --partition=oermannlab
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=4
@@ -7,18 +7,16 @@
 #SBATCH --time=20:00:00
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=rd3571@nyu.edu
-#SBATCH --array=0-2
 
 # =============================================================================
-# Run ICARE on IU-Xray (all 3 models) using a predefined (fixed) question list.
-# Array tasks 0-2 run all 3 models in parallel.
-# Skips MCQ generation and filtering; runs evaluation once per model.
+# Run ICARE on RexVal using a predefined (fixed) question list.
+# Skips MCQ generation and filtering; runs evaluation once.
 #
 # Usage:
 #   cd ICARE_score
-#   sbatch scripts/iuxray_data/iuxray_predefined.sh
-#   # or locally (runs task 0 = maira-2 only):
-#   bash scripts/iuxray_data/iuxray_predefined.sh
+#   sbatch scripts/rexval_data/icare_rexval_predefined.sh
+#   # or local run:
+#   bash scripts/rexval_data/icare_rexval_predefined.sh
 # =============================================================================
 
 set -eo pipefail
@@ -43,72 +41,64 @@ conda activate rrg-eval-clean
 # -----------------------------------------------------------------------------
 # Configuration
 # -----------------------------------------------------------------------------
-MODEL_SEED="${MODEL_SEED:-1}"
 EVAL_SEED="${EVAL_SEED:-123}"
 BASE_DATA_PATH="${RRGEVAL_BASE_DATA_PATH:-/gpfs/data/oermannlab/users/rd3571}"
 
 PREDEFINED_JSON="${PREDEFINED_JSON:-${ORIG_DIR}/outputs/predefined_ques_list/mcqa_data.json}"
 PREDEFINED_CSV="${PREDEFINED_CSV:-${ORIG_DIR}/outputs/predefined_ques_list/predefined_questions.csv}"
 
+REPORT_CSV="${REPORT_CSV:-${BASE_DATA_PATH}/cxr_report_datasets/rexval/RexVal_test_icare_200.csv}"
+OUTPUT_DIR="${OUTPUT_DIR:-${ORIG_DIR}/outputs/rexval/predefined/eval_seed_${EVAL_SEED}}"
+
 export PYTHONHASHSEED="${EVAL_SEED}"
 
-# -----------------------------------------------------------------------------
-# Pick model for this array task
-# -----------------------------------------------------------------------------
-MODEL_NAMES=("maira-2" "mimic-cxr-findings-baseline" "chexpert-mimic-cxr-findings-baseline")
-MODEL_CSV_PATHS=(
-    "${BASE_DATA_PATH}/RRG_models/maira-2/results/iuxray_report_gen_findings_frontal+lateral_seed${MODEL_SEED}_20250107_003058.csv"
-    "${BASE_DATA_PATH}/RRG_models/mimic-cxr-findings-baseline/results/iuxray_report_gen_findings_frontal_seed${MODEL_SEED}_20250106_213559.csv"
-    "${BASE_DATA_PATH}/RRG_models/chexpert-mimic-cxr-findings-baseline/results/iuxray_report_gen_findings_frontal+lateral_seed${MODEL_SEED}_20250106_211756.csv"
-)
-
-TASK_ID="${SLURM_ARRAY_TASK_ID:-0}"
-MODEL_NAME="${MODEL_NAMES[$TASK_ID]}"
-INPUT_CSV="${MODEL_CSV_PATHS[$TASK_ID]}"
-OUTPUT_DIR="${ORIG_DIR}/outputs/IU_xray/${MODEL_NAME}/model_seed_${MODEL_SEED}/eval_seed_${EVAL_SEED}/predefined"
-
 echo "============================================="
-echo "  ICARE Score - IU-Xray (predefined questions)"
+echo "  ICARE Score - RexVal (predefined questions)"
 echo "============================================="
-echo "Model       : ${MODEL_NAME}"
-echo "Model seed  : ${MODEL_SEED}"
-echo "Eval seed   : ${EVAL_SEED}"
-echo "Input CSV   : ${INPUT_CSV}"
-echo "Output dir  : ${OUTPUT_DIR}"
-echo "Predefined  : ${PREDEFINED_CSV}"
+echo "Predefined JSON : ${PREDEFINED_JSON}"
+echo "Predefined CSV  : ${PREDEFINED_CSV}"
+echo "Report CSV      : ${REPORT_CSV}"
+echo "Output dir      : ${OUTPUT_DIR}"
+echo "Eval seed       : ${EVAL_SEED}"
 echo "============================================="
+echo ""
 
 mkdir -p "${OUTPUT_DIR}"
 
 # -----------------------------------------------------------------------------
-# Step 1: Convert predefined JSON → CSV (each task checks; first one writes)
+# Step 1: Convert predefined mcqa_data.json → predefined_questions.csv
+# (skipped if CSV already exists)
 # -----------------------------------------------------------------------------
 if [ ! -f "${PREDEFINED_CSV}" ]; then
-    echo ""
     echo ">>> Step 1: Converting predefined questions JSON to CSV..."
     python src/predefined_mcqa_to_csv.py \
         --input_json "${PREDEFINED_JSON}" \
         --output_csv "${PREDEFINED_CSV}"
     echo ">>> Step 1 complete."
 else
-    echo ">>> Step 1: Predefined CSV already exists, skipping."
+    echo ">>> Step 1: Predefined CSV already exists, skipping conversion."
 fi
+echo ""
 
 # -----------------------------------------------------------------------------
-# Step 2: MCQA evaluation
+# Step 2: MCQA evaluation (single run, predefined questions)
 # -----------------------------------------------------------------------------
-echo ""
-echo ">>> Step 2: Running MCQA evaluation for ${MODEL_NAME}..."
+echo ">>> Step 2: Running MCQA evaluation..."
 python src/mcqa_evaluation.py \
     --base_dir "${OUTPUT_DIR}" \
     --seed "${EVAL_SEED}" \
-    --gen_report_csv_file "${INPUT_CSV}" \
-    --gt_report_csv_file "${INPUT_CSV}" \
+    --gen_report_csv_file "${REPORT_CSV}" \
+    --gt_report_csv_file "${REPORT_CSV}" \
     --predefined_ques_csv "${PREDEFINED_CSV}"
 echo ">>> Step 2 complete."
 
 echo ""
 echo "============================================="
-echo "  Done: ${MODEL_NAME}"
-echo "  ${OUTPUT_DIR}/mcqa_eval/"
+echo "  Predefined ICARE pipeline completed."
 echo "============================================="
+echo "Key output files:"
+echo "  ${OUTPUT_DIR}/mcqa_eval/mcqa_eval_answer_predictions.csv"
+echo "  ${OUTPUT_DIR}/mcqa_eval/mcq_eval_dataset_level_agreement_stats.csv"
+echo "  ${OUTPUT_DIR}/mcqa_eval/mcq_eval_report_level_stats.csv"
+echo "  ${OUTPUT_DIR}/mcqa_eval/mcq_eval_report_level_agreement_hist.png"
+echo ""

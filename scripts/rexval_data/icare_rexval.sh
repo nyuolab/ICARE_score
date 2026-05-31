@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --job-name=icare_rexval_200
-#SBATCH --partition=oermannlab
+#SBATCH --job-name=icare_rexval
+#SBATCH --partition=gpu4_medium 
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=128G
@@ -13,9 +13,9 @@
 #
 # Usage:
 #   cd ICARE_score
-#   sbatch scripts/rexval_data/rexval_200.sh
+#   sbatch scripts/rexval_data/icare_rexval.sh
 #   # or local run:
-#   bash scripts/rexval_data/rexval_200.sh
+#   bash scripts/rexval_data/icare_rexval.sh
 # =============================================================================
 
 set -eo pipefail
@@ -44,7 +44,7 @@ conda activate rrg-eval-clean
 # Configuration (override with exported env vars if needed)
 # -----------------------------------------------------------------------------
 EVAL_SEED="${EVAL_SEED:-123}"
-NUM_QUESTIONS="${NUM_QUESTIONS:-40}"
+NUM_QUESTIONS="${NUM_QUESTIONS:-60}"
 BASE_DATA_PATH="${RRGEVAL_BASE_DATA_PATH:-/gpfs/data/oermannlab/users/rd3571}"
 
 RAW_INPUT_CSV="${RAW_INPUT_CSV:-${BASE_DATA_PATH}/cxr_report_datasets/rexval/RexVal_test.csv}"
