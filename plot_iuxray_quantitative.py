@@ -1,5 +1,6 @@
 import glob
 import json
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -8,7 +9,9 @@ from scipy.optimize import minimize
 from scipy.special import logsumexp
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-BASE = "/gpfs/data/oermannlab/users/rd3571/ICARE_score/outputs/IU_xray"
+BASE    = "/gpfs/data/oermannlab/users/rd3571/ICARE_score/outputs/IU_xray"
+OUT_DIR = Path(BASE) / "plots"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 MODELS = {
     "mimic-cxr-findings-baseline":         "CheXpertPlus_MIMIC",
@@ -263,9 +266,9 @@ ax.legend(
 sns.despine()
 plt.tight_layout()
 
-plt.savefig("iuxray_metrics_quantitative.pdf", dpi=600, bbox_inches="tight")
-plt.savefig("iuxray_metrics_quantitative.png", dpi=600, bbox_inches="tight")
-print("\nSaved iuxray_metrics_quantitative.pdf / .png")
+plt.savefig(OUT_DIR / "iuxray_metrics_quantitative.pdf", dpi=600, bbox_inches="tight")
+plt.savefig(OUT_DIR / "iuxray_metrics_quantitative.png", dpi=600, bbox_inches="tight")
+print(f"\nSaved {OUT_DIR}/iuxray_metrics_quantitative.pdf / .png")
 plt.show()
 
 
@@ -645,17 +648,17 @@ for model_name in display_names:
             "ci_high":     means[model_name][metric] + cis[model_name][metric],
         })
 quant_df = pd.DataFrame(quant_rows)
-quant_df.to_csv("iuxray_quant_results.csv", index=False)
-print("Saved iuxray_quant_results.csv")
+quant_df.to_csv(OUT_DIR / "iuxray_quant_results.csv", index=False)
+print(f"Saved {OUT_DIR}/iuxray_quant_results.csv")
 
 # 2. BT ranking results (one row per source × model)
 bt_out = combined_bt[[
     "Source", "Rank", "Model", "Davidson score",
     "Normalized strength", "95% CI low", "95% CI high"
 ]].copy()
-bt_out.to_csv("iuxray_bt_results.csv", index=False)
-print("Saved iuxray_bt_results.csv")
-plt.savefig("iuxray_bt_ranking_comparison.pdf", dpi=600, bbox_inches="tight")
-plt.savefig("iuxray_bt_ranking_comparison.png", dpi=600, bbox_inches="tight")
-print("\nSaved iuxray_bt_ranking_comparison.pdf / .png")
+bt_out.to_csv(OUT_DIR / "iuxray_bt_results.csv", index=False)
+print(f"Saved {OUT_DIR}/iuxray_bt_results.csv")
+plt.savefig(OUT_DIR / "iuxray_bt_ranking_comparison.pdf", dpi=600, bbox_inches="tight")
+plt.savefig(OUT_DIR / "iuxray_bt_ranking_comparison.png", dpi=600, bbox_inches="tight")
+print(f"\nSaved {OUT_DIR}/iuxray_bt_ranking_comparison.pdf / .png")
 plt.show()

@@ -1,3 +1,4 @@
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -6,7 +7,9 @@ import seaborn as sns
 # =========================================================
 # CONFIG
 # =========================================================
-CSV_PATH = "iuxray_bt_results.csv"   # <- change if needed
+OUT_DIR  = Path("/gpfs/data/oermannlab/users/rd3571/ICARE_score/outputs/IU_xray/plots")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+CSV_PATH = OUT_DIR / "iuxray_bt_results.csv"
 
 TITLE_SIZE        = 28
 LABEL_SIZE        = 22
@@ -408,11 +411,11 @@ csv_out = pd.DataFrame(csv_rows, columns=[
     "Source", "Model", "Normalized strength",
     "CI_low_err", "CI_high_err", "CI_low_abs", "CI_high_abs",
 ])
-csv_out.to_csv("Fig3a_bradley_terry_rankings.csv", index=False)
-print("Saved Fig3a_bradley_terry_rankings.csv")
+csv_out.to_csv(OUT_DIR / "Fig3a_bradley_terry_rankings.csv", index=False)
+print(f"Saved {OUT_DIR}/Fig3a_bradley_terry_rankings.csv")
 
 # Save
-plt.savefig("iuxray_bt_ranking_comparison_from_csv.pdf", dpi=600, bbox_inches="tight")
-plt.savefig("iuxray_bt_ranking_comparison_from_csv.png", dpi=600, bbox_inches="tight")
+plt.savefig(OUT_DIR / "iuxray_bt_ranking_comparison_from_csv.pdf", dpi=600, bbox_inches="tight")
+plt.savefig(OUT_DIR / "iuxray_bt_ranking_comparison_from_csv.png", dpi=600, bbox_inches="tight")
 
 plt.show()

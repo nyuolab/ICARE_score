@@ -1,10 +1,13 @@
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-BASE = "/gpfs/data/oermannlab/users/rd3571/ICARE_score/outputs/rexval"
+BASE    = "/gpfs/data/oermannlab/users/rd3571/ICARE_score/outputs/rexval"
+OUT_DIR = Path(BASE) / "plots"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 BASELINES_CSV  = f"{BASE}/rexval_test_200/baselines/rexval_test_200/rexval_prepared_results.csv"
 ORIGIN_MAP_CSV = f"{BASE}/rexval_test_200/baselines/rexval_prepared.csv"
@@ -176,7 +179,7 @@ ax.legend(
 sns.despine()
 plt.tight_layout()
 
-plt.savefig("rexval_metrics_quantitative.pdf", dpi=600, bbox_inches="tight")
-plt.savefig("rexval_metrics_quantitative.png", dpi=600, bbox_inches="tight")
-print("Saved rexval_metrics_quantitative.pdf / .png")
+plt.savefig(OUT_DIR / "rexval_metrics_quantitative.pdf", dpi=600, bbox_inches="tight")
+plt.savefig(OUT_DIR / "rexval_metrics_quantitative.png", dpi=600, bbox_inches="tight")
+print(f"Saved {OUT_DIR}/rexval_metrics_quantitative.pdf / .png")
 plt.show()

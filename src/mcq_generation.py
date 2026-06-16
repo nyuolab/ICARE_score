@@ -38,11 +38,17 @@ def make_llama_request(
     frequency_penalty: float = 0.0
 ) -> Optional[Dict[str, Any]]:
     """Make a request to the LLAMA API."""
-    headers = {
-        "apiKey": api_key,
-        "accept": "application/json",
-        "Content-Type": "application/json"
-    }
+    if Config.API_AUTH_HEADER_TYPE == "bearer":
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+    else:
+        headers = {
+            "apiKey": api_key,
+            "accept": "application/json",
+            "Content-Type": "application/json"
+        }
     
     data = {
         "model": model,

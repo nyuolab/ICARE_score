@@ -82,15 +82,16 @@ INPUT: test_data/sample_iuxray_reports.csv
 
 ### 1. Configure `.env`
 
-Copy `.env.example` to `.env` and set `RRGEVAL_API_KEY`, `RRGEVAL_API_URL`, etc. (see root README).
+- **Local LLM (no API key):** Follow the "Local LLM Setup" section in the root README, then `cp .env.local_example .env`.
+- **Private/hosted API:** `cp .env.example .env` and fill in `RRGEVAL_API_KEY`, `RRGEVAL_API_URL`.
 
 ### 2. Run the eval
 
 From the repo root:
 
 ```bash
-sbatch scripts/example_test/run_eval.sh
-# or: bash scripts/example_test/run_eval.sh
+bash scripts/example_test/run_eval.sh
+# or: sbatch scripts/example_test/run_eval.sh  (SLURM)
 ```
 
 Results in `test_data/output/`. Uses 5 MCQs per report (instead of 40) for a fast run.
@@ -98,7 +99,7 @@ Results in `test_data/output/`. Uses 5 MCQs per report (instead of 40) for a fas
 ### 3. (Optional) Question categorization
 
 ```bash
-sbatch scripts/example_test/run_question_categorization.sh
+bash scripts/example_test/run_question_categorization.sh
 ```
 
 Results in `test_data/output/question_categorization/`.
@@ -108,5 +109,3 @@ Results in `test_data/output/question_categorization/`.
 git clone https://huggingface.co/ncbi/MedCPT-Query-Encoder /path/to/MedCPT-Query-Encoder
 # In .env: MEDCPT_MODEL_PATH=/path/to/MedCPT-Query-Encoder
 ```
-
-> **Note:** Requires LLM API access configured in `.env`.

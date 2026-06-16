@@ -1,0 +1,11 @@
+# Requirements for local LLM serving via vLLM.
+# Install in a separate environment to avoid conflicts with the main pipeline env:
+#
+#   conda create -n vllm-server python=3.10 -y
+#   conda activate vllm-server
+#   pip install -r scripts/local_llm/requirements_local_llm.txt
+#
+# Then start the server:
+#   bash scripts/local_llm/launch_vllm_server.sh
+
+vllm>=0.4.0

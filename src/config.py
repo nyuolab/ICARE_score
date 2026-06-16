@@ -35,6 +35,9 @@ class Config:
     # Filtering specific parameters
     FILTERING_MAX_TOKENS: int = int(os.getenv("RRGEVAL_FILTERING_MAX_TOKENS", "10"))
 
+    # API auth header type: "bearer" (standard, for vLLM/Ollama/OpenAI) or "apikey" (legacy private endpoint)
+    API_AUTH_HEADER_TYPE: str = os.getenv("RRGEVAL_API_AUTH_HEADER_TYPE", "bearer")
+
     @classmethod
     def validate_config(cls) -> bool:
         """Validate that required configuration is set."""
