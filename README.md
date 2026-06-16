@@ -2,7 +2,7 @@
 
 ICARE is an interpretable LLM-based metric for radiology report generation. Given a ground-truth and a generated report, it generates multiple-choice questions, filters them for report-dependency, then measures how consistently an LLM answers those questions when given each report. Higher agreement = higher fidelity to the ground-truth clinical content.
 
-**Paper:** [Nature Communications submission]  
+**Paper:** [arXiv:2508.02808](https://arxiv.org/abs/2508.02808)  
 **Code:** This repository
 
 ---
