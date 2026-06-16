@@ -41,7 +41,7 @@ N_BOOT = 2000
 RNG    = np.random.default_rng(42)
 CANDIDATES = ["radgraph", "bertscore", "s_emb", "bleu"]
 CAND_LABELS = {"radgraph": "RadGraph", "bertscore": "BERTScore",
-               "s_emb": "s-emb", "bleu": "BLEU"}
+               "s_emb": "SembScore", "bleu": "BLEU"}
 
 # ---------------------------------------------------------------------------
 # Load RexVal reports CSV
@@ -103,7 +103,13 @@ green_df     = pd.read_csv(BASELINES / "green/rexval_prepared_green_results.csv"
 green_scores = green_df["green_score"].values  # (200,)
 
 # ---------------------------------------------------------------------------
-# Load RRG baselines (BLEU, BERTScore, s-emb/CheXbert, RadGraph, RadCliQ-v1)
+# Load AlignScore baseline
+# ---------------------------------------------------------------------------
+alignscore_df     = pd.read_csv(BASELINES / "alignscore/rexval_prepared_alignscore_results.csv")
+alignscore_scores = alignscore_df["alignscore"].values  # (200,)
+
+# ---------------------------------------------------------------------------
+# Load RRG baselines (BLEU, BERTScore, SembScore, RadGraph, RadCliQ-v1)
 # ---------------------------------------------------------------------------
 rrg_df    = pd.read_csv(BASELINES / "rexval_test_200/rexval_prepared_results.csv")
 bleu_sc   = rrg_df["bleu_score"].values
@@ -120,9 +126,10 @@ merged["ap_gt"]     = ap_gt
 merged["ap_gen"]    = ap_gen
 merged["ap_avg"]    = ap_avg
 merged["ap_pred"]   = ap_pred
-merged["crimson"]   = crimson_scores
-merged["green"]     = green_scores
-merged["bleu"]      = bleu_sc
+merged["crimson"]    = crimson_scores
+merged["green"]      = green_scores
+merged["alignscore"] = alignscore_scores
+merged["bleu"]       = bleu_sc
 merged["bertscore"] = bert_sc
 merged["semb"]      = semb_sc
 merged["radgraph"]  = rg_sc
@@ -137,9 +144,10 @@ merged["dis_gt"]      = 1 - merged["ap_gt"]   / 100
 merged["dis_gen"]     = 1 - merged["ap_gen"]  / 100
 merged["dis_avg"]     = 1 - merged["ap_avg"]  / 100
 merged["dis_pred"]    = 1 - merged["ap_pred"] / 100
-merged["neg_crimson"] = -merged["crimson"]
-merged["neg_green"]   = -merged["green"]
-merged["neg_bleu"]    = -merged["bleu"]
+merged["neg_crimson"]    = -merged["crimson"]
+merged["neg_green"]      = -merged["green"]
+merged["neg_alignscore"] = -merged["alignscore"]
+merged["neg_bleu"]       = -merged["bleu"]
 merged["neg_bert"]    = -merged["bertscore"]
 merged["neg_semb"]    = -merged["semb"]
 merged["neg_rg"]      = -merged["radgraph"]
@@ -175,15 +183,16 @@ def compute_corr_by_cand(df, score_col):
 
 # (label, disagreement_col)  — higher column value = worse report
 CORR_METRICS = [
-    ("ICARE_AVG",        "dis_avg"),
-    ("ICARE_PREDEFINED", "dis_pred"),
     ("BLEU",             "neg_bleu"),
     ("BERTScore",        "neg_bert"),
-    ("s-emb",            "neg_semb"),
+    ("SembScore",        "neg_semb"),
     ("RadGraph",         "neg_rg"),
     ("RadCliQ-v1",       "radcliq"),
     ("GREEN",            "neg_green"),
+    ("AlignScore",       "neg_alignscore"),
     ("CRIMSON",          "neg_crimson"),
+    ("ICARE_AVG",        "dis_avg"),
+    ("ICARE_PREDEFINED", "dis_pred"),
 ]
 
 print("Computing correlations (Kendall τ / Pearson r vs clinically significant errors)...")
@@ -220,80 +229,142 @@ corr_table.to_csv(out_csv)
 print(f"\nCorrelation table saved: {out_csv}")
 
 # ---------------------------------------------------------------------------
-# LaTeX table — two tables, 2 candidate columns each
+# LaTeX table — single table* with two tabulars
 # ---------------------------------------------------------------------------
 CAND_HEADER = {"radgraph": "RadGraph", "bertscore": "BERTScore",
-               "s_emb": "s-emb", "bleu": "BLEU"}
+               "s_emb": "SembScore", "bleu": "BLEU"}
 
+# (candidate list, include top-span "Correlation with Significant Error Counts" row)
 TABLE_SPLITS = [
-    ("a", ["radgraph", "bertscore"]),
-    ("b", ["s_emb",    "bleu"]),
+    (["radgraph", "bertscore"], True),
+    (["s_emb",    "bleu"],      False),
 ]
 
 def latex_fmt(val, lo, hi):
-    return f"${val:.2f}_{{{lo:.2f}}}^{{{hi:.2f}}}$"
+    return f"${val:.2f}\\;[{lo:.2f},{hi:.2f}]$"
 
-def build_latex_table(cands, table_label):
-    col_spec = "l" + "".join(["cc"] * len(cands))
+def _col_top2(values):
+    """Return the two largest distinct values (higher = better)."""
+    unique = []
+    for v in sorted(values, reverse=True):
+        if not any(np.isclose(v, u) for u in unique):
+            unique.append(v)
+        if len(unique) == 2:
+            break
+    return unique
+
+def latex_fmt_highlight(val, lo, hi, rank):
+    """rank 0 = best (green), 1 = second-best (grey), else plain."""
+    s = latex_fmt(val, lo, hi)
+    if rank == 0:
+        return f"\\cellcolor{{green!25}}{s}"
+    if rank == 1:
+        return f"\\cellcolor{{gray!25}}{s}"
+    return s
+
+LATEX_LABELS = {
+    "ICARE_AVG":        r"\textbf{ICARE}$_{\textbf{AVG}}$",
+    "ICARE_PREDEFINED": r"\textbf{ICARE}$_{\textbf{PRE}}$",
+    "CRIMSON":          r"CRIMSON*",
+}
+
+def build_tabular(cands, include_top_header):
+    n_data = len(cands) * 2
+    col_spec = "l" + "c" * n_data
     lines = []
-    lines.append(r"\begin{table}[ht]")
-    lines.append(r"\centering")
-    lines.append(r"\small")
-    lines.append(
-        r"\caption{Kendall $\tau$ and Pearson $r$ (95\% CI) with clinically significant errors "
-        r"on RexVal (n=50 per column). Positive values indicate the metric correctly detects worse reports.}"
-    )
-    lines.append(r"\label{tab:rexval_correlation_" + table_label + r"}")
     lines.append(r"\begin{tabular}{" + col_spec + r"}")
     lines.append(r"\toprule")
 
-    # Header row 1: candidate type groups
-    header1 = [r"\textbf{Metric}"]
+    if include_top_header:
+        lines.append(f" & \\multicolumn{{{n_data}}}{{c}}{{\\textbf{{Correlation with Significant Error Counts}}}} \\\\")
+        lines.append(f"\\cmidrule(lr){{2-{n_data + 1}}}")
+
+    # Candidate group headers
+    grp_headers = [""]
     for cand in cands:
-        header1.append(f"\\multicolumn{{2}}{{c}}{{\\textbf{{{CAND_HEADER[cand]}}}}}")
-    lines.append(" & ".join(header1) + r" \\")
+        grp_headers.append(f"\\multicolumn{{2}}{{c}}{{\\textbf{{{CAND_HEADER[cand]}}}}}")
+    lines.append(" & ".join(grp_headers) + r" \\")
 
-    # Header row 2: τ and r per candidate
-    header2 = [""]
-    for _ in cands:
-        header2 += [r"$\tau$ [95\%CI]", r"$r$ [95\%CI]"]
-    lines.append(" & ".join(header2) + r" \\")
-
-    # Cmidrule under each candidate group
+    # Cmidrules under each group
     cmidrules = []
     for ci in range(len(cands)):
         start = 2 + ci * 2
-        end   = start + 1
-        cmidrules.append(f"\\cmidrule(lr){{{start}-{end}}}")
+        cmidrules.append(f"\\cmidrule(lr){{{start}-{start + 1}}}")
     lines.append(" ".join(cmidrules))
 
-    # Data rows
-    prev_was_icare = False
-    for label, col in CORR_METRICS:
-        is_icare = label.startswith("ICARE")
-        if not is_icare and prev_was_icare:
-            lines.append(r"\midrule")
-        prev_was_icare = is_icare
+    # Sub-header: Metric | Kendall τ | Pearson r | ...
+    sub_headers = [r"\textbf{Metric}"]
+    for _ in cands:
+        sub_headers += [r"Kendall $\tau$", r"Pearson $r$"]
+    lines.append(" & ".join(sub_headers) + r" \\")
+    lines.append(r"\midrule")
 
-        prefix = r"\textbf{" if is_icare else ""
-        suffix = r"}"        if is_icare else ""
-        row = [f"{prefix}{label}{suffix}"]
-        for cand in cands:
+    # Pre-compute per-column top-2 values for green/grey highlighting
+    col_top2_tau = {
+        cand: _col_top2([corr_results[lbl][cand]["tau"] for lbl, _ in CORR_METRICS])
+        for cand in cands
+    }
+    col_top2_r = {
+        cand: _col_top2([corr_results[lbl][cand]["r"] for lbl, _ in CORR_METRICS])
+        for cand in cands
+    }
+
+    def _rank(val, top2):
+        if top2 and np.isclose(val, top2[0]):
+            return 0
+        if len(top2) > 1 and np.isclose(val, top2[1]):
+            return 1
+        return -1
+
+    # Data rows
+    prev_is_icare = False
+    for label, _ in CORR_METRICS:
+        is_icare = label.startswith("ICARE")
+        if is_icare and not prev_is_icare:
+            lines.append(r"\midrule")
+        prev_is_icare = is_icare
+
+        display_label = LATEX_LABELS.get(label, label)
+        lines.append(display_label)
+        for ci, cand in enumerate(cands):
             c = corr_results[label][cand]
-            row.append(latex_fmt(c["tau"], c["tau_lo"], c["tau_hi"]))
-            row.append(latex_fmt(c["r"],   c["r_lo"],   c["r_hi"]))
-        lines.append(" & ".join(row) + r" \\")
+            tau_str = latex_fmt_highlight(
+                c["tau"], c["tau_lo"], c["tau_hi"], _rank(c["tau"], col_top2_tau[cand]))
+            r_str   = latex_fmt_highlight(
+                c["r"],   c["r_lo"],   c["r_hi"],   _rank(c["r"],   col_top2_r[cand]))
+            suffix = r" \\" if ci == len(cands) - 1 else ""
+            lines.append(f" & {tau_str} & {r_str}{suffix}")
 
     lines.append(r"\bottomrule")
     lines.append(r"\end{tabular}")
-    lines.append(r"\end{table}")
     return "\n".join(lines)
 
-all_tables = []
-for table_label, cands in TABLE_SPLITS:
-    all_tables.append(build_latex_table(cands, table_label))
+def build_full_latex_table():
+    lines = []
+    lines.append(r"% Requires \usepackage[table]{xcolor} in the main document preamble.")
+    lines.append(r"\begin{table*}[ht]")
+    lines.append(r"\centering")
+    lines.append(r"\small")
+    lines.append(
+        r"\caption{Kendall $\tau$ and Pearson $r$ (95\% CI) between automatic metrics and radiologist-derived"
+        "\n"
+        r"clinically significant error counts ($n{=}50$ per column). Columns refer to different candidate"
+        "\n"
+        r"reports on RexVal, each chosen to optimize a specific metric. Positive values indicate the metric"
+        "\n"
+        r"correctly detects worse reports. *CRIMSON results are averaged across 5 runs.}"
+    )
+    lines.append(r"\label{tab:rexval_correlation}")
+    for idx, (cands, include_top) in enumerate(TABLE_SPLITS):
+        lines.append(build_tabular(cands, include_top))
+        if idx < len(TABLE_SPLITS) - 1:
+            lines.append("")
+            lines.append(r"\vspace{6pt}")
+            lines.append("")
+    lines.append(r"\end{table*}")
+    return "\n".join(lines)
 
-latex_str = "\n\n".join(all_tables)
+latex_str = build_full_latex_table()
 out_tex = OUT_DIR / "rexval_correlation_table.tex"
 out_tex.write_text(latex_str)
 print(f"LaTeX table saved:      {out_tex}")
@@ -312,19 +383,21 @@ fig1, axes1 = plt.subplots(1, 4, figsize=(18, 5), sharey=True)
 for ax, cand in zip(axes1, CANDIDATES):
     sub = merged[merged["origin"] == cand].copy()
     sub["dis_avg_pct"] = 100 - sub["ap_avg"]   # disagreement in % units
-    c = corr_results["ICARE_AVG"][cand]
     ax.scatter(sub["dis_avg_pct"], sub["mean_clin_sig_errors"],
                alpha=0.7, edgecolors="k", linewidths=0.4, s=55, color="steelblue")
     m, b = np.polyfit(sub["dis_avg_pct"], sub["mean_clin_sig_errors"], 1)
     xs = np.linspace(sub["dis_avg_pct"].min(), sub["dis_avg_pct"].max(), 100)
     ax.plot(xs, m * xs + b, "r--", linewidth=1.5)
-    ax.set_xlabel("ICARE disagreement (100 − AVG %)", fontsize=12)
-    ax.set_title(f"{cand}\nτ={c['tau']:.2f}  r={c['r']:.2f}", fontsize=13)
+    ax.set_xlabel("ICARE disagreement (100 − AVG %)", fontsize=13, fontweight="bold")
+    ax.set_title(CAND_LABELS[cand], fontsize=15, fontweight="bold")
+    ax.tick_params(axis="both", labelsize=13)
+    for lbl in ax.get_xticklabels() + ax.get_yticklabels():
+        lbl.set_fontweight("bold")
 
-axes1[0].set_ylabel("Mean clin. sig. errors", fontsize=13)
+axes1[0].set_ylabel("Mean clin. sig. errors", fontsize=14, fontweight="bold")
 fig1.suptitle(
     "ICARE disagreement vs Radiologist Clinically Significant Errors (n=50 per panel)",
-    y=1.02, fontsize=14)
+    y=1.02, fontsize=15, fontweight="bold")
 fig1.tight_layout()
 out1 = OUT_DIR / "icare_vs_errors_scatter.png"
 fig1.savefig(out1, dpi=600, bbox_inches="tight")
@@ -380,10 +453,11 @@ def get_metric_top1(df_merged, col, ascending):
 FOREST_METRICS = [
     ("ICARE_AVG ◄",       "ap_avg",    False),
     ("ICARE_PREDEFINED",  "ap_pred",   False),
-    ("CRIMSON",           "crimson",   False),
-    ("GREEN",             "green",     False),
-    ("BERTScore",         "bertscore", False),
-    ("s-emb",             "semb",      False),
+    ("CRIMSON",           "crimson",    False),
+    ("GREEN",             "green",      False),
+    ("AlignScore",        "alignscore", False),
+    ("BERTScore",         "bertscore",  False),
+    ("SembScore",          "semb",      False),
     ("RadGraph",          "radgraph",  False),
     ("BLEU",              "bleu",      False),
     ("RadCliQ-v1",        "radcliq",   True),   # lower = fewer errors = better
@@ -406,25 +480,23 @@ for label, col, asc in FOREST_METRICS:
 
     mean_pct = np.mean(per_rater_pcts)
 
-    # Bootstrap across studies
-    boot_means  = []
+    # Precompute common study set once — intersection across all raters and metric
+    m1_idx = metric_top1.set_index("study_number")
+    all_sets = [set(rater_top1_by_rater[r]["study_number"]) for r in RATERS] + [set(m1_idx.index)]
+    common_arr = np.array(sorted(set.intersection(*all_sets)))
+
+    # Bootstrap across studies — resample positionally from common_arr
+    boot_means = []
     for _ in range(N_BOOT):
-        idx = RNG.choice(N_STUDIES, N_STUDIES, replace=True)
+        pos     = RNG.choice(len(common_arr), len(common_arr), replace=True)
+        sampled = common_arr[pos]
         boot_per_rater = []
         for rater in RATERS:
             df_r = rater_top1_by_rater[rater].set_index("study_number")
-            m1   = metric_top1.set_index("study_number")
-            common = df_r.index.intersection(m1.index)
-            common_arr = np.array(sorted(common))
-            if len(common_arr) == 0:
-                continue
-            sampled = common_arr[idx[idx < len(common_arr)]]
             hits = (df_r.loc[sampled, "rater_winner"].values
-                    == m1.loc[sampled, "metric_winner"].values)
-            if len(hits) > 0:
-                boot_per_rater.append(hits.mean() * 100)
-        if boot_per_rater:
-            boot_means.append(np.mean(boot_per_rater))
+                    == m1_idx.loc[sampled, "metric_winner"].values)
+            boot_per_rater.append(hits.mean() * 100)
+        boot_means.append(np.mean(boot_per_rater))
 
     lo, hi = np.percentile(boot_means, 2.5), np.percentile(boot_means, 97.5)
     forest_per_rater.append(dict(label=label, pcts=per_rater_pcts,
@@ -609,3 +681,113 @@ print(f"  {out_csv}")
 print(f"  {out1}")
 print(f"  {out2}")
 print(f"  {out3}")
+
+
+
+# ============================================================
+# CSV EXPORT — ReXVal forest plots
+# Add these blocks at the END of plot_rexval_correlation.py
+# (after the existing Figure 2 and Figure 3 code)
+# All variables are already computed in the script.
+# ============================================================
+
+import pandas as pd
+
+# ────────────────────────────────────────────────────────────
+# EXPORT A: panel_rexval_forest_per_rater.csv
+# Source: forest_per_rater  (computed just before Figure 2)
+# Each row = one metric
+# Columns: metric, mean, ci_lo, ci_hi,
+#          rater_0 … rater_5  (positional, matching RATERS list),
+#          inter_rater_pct, n_studies
+# ────────────────────────────────────────────────────────────
+
+rows_rx_forest = []
+for row in forest_per_rater:
+    d = {
+        "metric":          row["label"],
+        "mean":            round(row["mean"], 4),
+        "ci_lo":           round(row["lo"],   4),
+        "ci_hi":           round(row["hi"],   4),
+        "inter_rater_pct": round(inter_rater_pct, 1),
+        "n_studies":       N_STUDIES,
+    }
+    for ri, pct in enumerate(row["pcts"]):
+        d[f"rater_{RATERS[ri]}"] = round(pct, 4)   # rater_0 … rater_5
+    rows_rx_forest.append(d)
+
+df_rx_forest = pd.DataFrame(rows_rx_forest)
+df_rx_forest.to_csv(OUT_DIR / "panel_rexval_forest_per_rater.csv", index=False)
+print("Saved panel_rexval_forest_per_rater.csv")
+print(df_rx_forest.to_string(index=False))
+
+
+# ────────────────────────────────────────────────────────────
+# EXPORT B: panel_rexval_forest_decisive.csv
+# Source: forest_consensus  (computed just before Figure 3)
+# Each row = one metric
+# Columns: metric, pct, ci_lo, ci_hi, n_decisive, threshold,
+#          inter_rater_consensus_pct
+# ────────────────────────────────────────────────────────────
+
+rows_rx_dec = []
+for row in forest_consensus:
+    rows_rx_dec.append({
+        "metric":                   row["label"],
+        "pct":                      round(row["pct"], 4),
+        "ci_lo":                    round(row["lo"],  4),
+        "ci_hi":                    round(row["hi"],  4),
+        "n_decisive":               N_DECISIVE,
+        "threshold":                THRESHOLD,
+        "inter_rater_consensus_pct": round(ir_cons_pct, 1),
+    })
+
+df_rx_dec = pd.DataFrame(rows_rx_dec)
+df_rx_dec.to_csv(OUT_DIR / "panel_rexval_forest_decisive.csv", index=False)
+print("\nSaved panel_rexval_forest_decisive.csv")
+print(df_rx_dec.to_string(index=False))
+
+
+# ────────────────────────────────────────────────────────────
+# EXPORT C: panel_rexval_correlation.csv
+# Source: corr_results  (the Kendall/Pearson table)
+# One row per (metric, candidate_type)
+# Columns: metric, candidate, kendall_tau, kendall_lo, kendall_hi,
+#          pearson_r, pearson_lo, pearson_hi
+# ────────────────────────────────────────────────────────────
+
+rows_rx_corr = []
+for label, _ in CORR_METRICS:
+    for cand in CANDIDATES:
+        c = corr_results[label][cand]
+        rows_rx_corr.append({
+            "metric":      label,
+            "candidate":   CAND_LABELS[cand],
+            "kendall_tau": round(c["tau"],    4),
+            "kendall_lo":  round(c["tau_lo"], 4),
+            "kendall_hi":  round(c["tau_hi"], 4),
+            "pearson_r":   round(c["r"],      4),
+            "pearson_lo":  round(c["r_lo"],   4),
+            "pearson_hi":  round(c["r_hi"],   4),
+        })
+
+df_rx_corr = pd.DataFrame(rows_rx_corr)
+df_rx_corr.to_csv(OUT_DIR / "panel_rexval_correlation.csv", index=False)
+print("\nSaved panel_rexval_correlation.csv")
+print(df_rx_corr.to_string(index=False))
+
+
+# ────────────────────────────────────────────────────────────
+# EXPORT D: panel_rexval_scatter.csv
+# Source: merged DataFrame  (used for Figure 1 scatter)
+# Columns: study_number, origin, dis_avg_pct, mean_clin_sig_errors
+# Useful if you want to recreate the scatter panel in the combined figure
+# ────────────────────────────────────────────────────────────
+
+scatter_df = merged[["study_number", "origin",
+                      "ap_avg", "mean_clin_sig_errors"]].copy()
+scatter_df["dis_avg_pct"] = 100 - scatter_df["ap_avg"]
+scatter_df = scatter_df.drop(columns=["ap_avg"])
+scatter_df.to_csv(OUT_DIR / "panel_rexval_scatter.csv", index=False)
+print("\nSaved panel_rexval_scatter.csv")
+print(scatter_df.head(8).to_string(index=False))

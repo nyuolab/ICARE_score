@@ -123,10 +123,16 @@ green_df   = pd.read_csv(BASELINES_DIR / "green/radpref_prepared_green_results.c
 green_diff = green_df["green_score"].values[:N] - green_df["green_score"].values[N:]
 
 # ---------------------------------------------------------------------------
-# Load RRG baselines (CheXbert=semb_score, RadGraph, BERTScore)
+# Load AlignScore baseline
+# ---------------------------------------------------------------------------
+alignscore_df   = pd.read_csv(BASELINES_DIR / "alignscore/radpref_prepared_alignscore_results.csv")
+alignscore_diff = alignscore_df["alignscore"].values[:N] - alignscore_df["alignscore"].values[N:]
+
+# ---------------------------------------------------------------------------
+# Load RRG baselines (SembScore, RadGraph, BERTScore)
 # ---------------------------------------------------------------------------
 rrg_df         = pd.read_csv(BASELINES_DIR / "radpref/radpref_prepared_results.csv")
-chexbert_diff  = rrg_df["semb_score"].values[:N]        - rrg_df["semb_score"].values[N:]
+sembscore_diff  = rrg_df["semb_score"].values[:N]        - rrg_df["semb_score"].values[N:]
 radgraph_diff  = rrg_df["radgraph_combined"].values[:N] - rrg_df["radgraph_combined"].values[N:]
 bertscore_diff = rrg_df["bertscore"].values[:N]         - rrg_df["bertscore"].values[N:]
 
@@ -135,13 +141,14 @@ bertscore_diff = rrg_df["bertscore"].values[:N]         - rrg_df["bertscore"].va
 # ---------------------------------------------------------------------------
 print("Computing correlations from output files...")
 computed = {
-    "CheXbert":         compute_metric_corrs(chexbert_diff,   compute_ci=True),
-    "RadGraph":         compute_metric_corrs(radgraph_diff,   compute_ci=True),
-    "BERTScore":        compute_metric_corrs(bertscore_diff,  compute_ci=True),
-    "GREEN":            compute_metric_corrs(green_diff,      compute_ci=True),
-    "CRIMSON":          compute_metric_corrs(crimson_diff,    compute_ci=True),
-    "ICARE_predefined": compute_metric_corrs(icare_pred_diff, compute_ci=True),
-    "ICARE":            compute_metric_corrs(icare_diff,      compute_ci=True),
+    "SembScore":        compute_metric_corrs(sembscore_diff,   compute_ci=True),
+    "RadGraph":         compute_metric_corrs(radgraph_diff,    compute_ci=True),
+    "BERTScore":        compute_metric_corrs(bertscore_diff,   compute_ci=True),
+    "GREEN":            compute_metric_corrs(green_diff,       compute_ci=True),
+    "AlignScore":       compute_metric_corrs(alignscore_diff,  compute_ci=True),
+    "CRIMSON":          compute_metric_corrs(crimson_diff,     compute_ci=True),
+    "ICARE_predefined": compute_metric_corrs(icare_pred_diff,  compute_ci=True),
+    "ICARE":            compute_metric_corrs(icare_diff,       compute_ci=True),
 }
 
 rater_labels = ["Rater 1", "Rater 2", "Rater 3", "Averaged"]
@@ -176,7 +183,7 @@ for lab, tau, r, kci, pci in zip(pair_labels, ir_kendall, ir_pearson, ir_kendall
 # Metric table — RaTEScore hard-coded (no produced output files)
 # ---------------------------------------------------------------------------
 paper = {
-    "CheXbert":  computed["CheXbert"],
+    "SembScore": computed["SembScore"],
     "RadGraph":  computed["RadGraph"],
     "BERTScore": computed["BERTScore"],
     # hard-coded from CRIMSON paper (no produced output files)
@@ -185,6 +192,7 @@ paper = {
         "pearson": [0.64, 0.65, 0.66, 0.68],
     },
     "GREEN":               computed["GREEN"],
+    "AlignScore":          computed["AlignScore"],
     "CRIMSON":             computed["CRIMSON"],
     "ICARE\n(predefined)": computed["ICARE_predefined"],
     "ICARE":               computed["ICARE"],
@@ -198,37 +206,47 @@ interrater = {
 }
 
 # ---------------------------------------------------------------------------
-# Plot
+# Plot — all per-rater bars; averaged score label only (metrics + inter-rater)
 # ---------------------------------------------------------------------------
-DARK_RED  = "#8B1A1A"
-IR_COLOR  = "#707070"
+DARK_RED = "#8B1A1A"
+IR_COLOR = "#707070"
+AVG_IDX  = 3   # "Averaged" entry in rater_labels
 
 MARKERS  = ["o", "s", "D", "*"]
-OFFSETS  = [-0.27, -0.09, 0.09, 0.27]   # wider spread so labels don't stack
-SIZES    = [9, 9, 9, 16]
+OFFSETS  = [-0.27, -0.09, 0.09, 0.27]
+SIZES    = [14, 14, 14, 22]
 ZORDERS  = [2, 2, 2, 4]
 
-IR_MARKERS = ["o", "D", "^"]
-IR_OFFSETS = [-0.18, 0, 0.18]
-IR_HALIGNS = ["right", "center", "left"]
+IR_PAIR_MARKERS = ["o", "D", "^"]
+IR_PAIR_OFFSETS = [-0.27, -0.09, 0.09]
+IR_AVG_OFFSET   = 0.27
+IR_PAIR_SIZE    = 14
+IR_AVG_SIZE     = 22
+
+FS_TITLE     = 32
+FS_YLABEL    = 28
+FS_TICK      = 24
+FS_XLABEL    = 22
+FS_VALUE_AVG = 20
+FS_LEGEND    = 22
 
 metric_names = list(paper.keys())
 n_metrics    = len(metric_names)
 
 YLIMS = {"kendall": (0.0, 0.98), "pearson": (0.0, 1.02)}
 
-fig, axes = plt.subplots(2, 1, figsize=(32, 13), sharex=True)
+fig, axes = plt.subplots(2, 1, figsize=(28, 14), sharex=True)
 fig.suptitle("Correlation with Radiologist Preferences (RadPref)",
-             fontsize=20, fontweight="bold", y=0.99)
-fig.subplots_adjust(hspace=0.06, right=0.91, bottom=0.14)
+             fontsize=FS_TITLE, fontweight="bold", y=0.98)
+fig.subplots_adjust(hspace=0.16, bottom=0.36, top=0.94)
 
 for corr_key, ax in zip(["kendall", "pearson"], axes):
     ylabel = "Kendall $\\tau_b$" if corr_key == "kendall" else "Pearson $r$"
-    ax.set_ylabel(ylabel, fontsize=20, fontweight="bold", labelpad=12)
+    ax.set_ylabel(ylabel, fontsize=FS_YLABEL, fontweight="bold", labelpad=14)
     ylo, yhi = YLIMS[corr_key]
     ax.set_ylim(ylo, yhi)
     ax.set_yticks(np.arange(0.0, yhi + 0.01, 0.2))
-    ax.tick_params(axis="y", labelsize=16)
+    ax.tick_params(axis="y", labelsize=FS_TICK, width=1.5, length=6)
     for label in ax.get_yticklabels():
         label.set_fontweight("bold")
     ax.grid(axis="y", alpha=0.35, linewidth=0.8)
@@ -243,7 +261,7 @@ for corr_key, ax in zip(["kendall", "pearson"], axes):
                 zip(vals, MARKERS, OFFSETS, SIZES, ZORDERS)):
             xpos = mi + offset
             yerr = None
-            y_top = val   # label anchor: top of CI bar, or point if no CI
+            y_top = val
             if ci is not None:
                 lo, hi = ci[ri]
                 yerr  = [[val - lo], [hi - val]]
@@ -255,80 +273,103 @@ for corr_key, ax in zip(["kendall", "pearson"], axes):
                 fmt=marker,
                 color=DARK_RED,
                 markersize=ms,
-                markeredgewidth=0.6,
-                markeredgecolor="white" if ri == 3 else DARK_RED,
-                capsize=4, capthick=1.5, elinewidth=1.5,
+                markeredgewidth=1.0,
+                markeredgecolor="white" if ri == AVG_IDX else DARK_RED,
+                capsize=7, capthick=2.0, elinewidth=2.0,
                 zorder=zord,
             )
 
-            fw = "bold" if ri == 3 else "normal"
-            ax.text(xpos, y_top + 0.012, f"{val:.2f}",
-                    ha="center", va="bottom", fontsize=13,
-                    fontweight=fw, color=DARK_RED, zorder=5)
+            if ri == AVG_IDX:
+                ax.text(xpos, y_top + 0.018, f"{val:.2f}",
+                        ha="center", va="bottom", fontsize=FS_VALUE_AVG,
+                        fontweight="bold", color=DARK_RED, zorder=5)
 
     # Vertical divider before Inter-rater
-    ax.axvline(n_metrics - 0.5, color="black", linewidth=1.2)
+    ax.axvline(n_metrics - 0.5, color="black", linewidth=1.5)
 
-    # Inter-rater column
-    ir_x    = n_metrics
-    ir_vals = interrater[corr_key]
-    ir_cis  = interrater[f"{corr_key}_ci"]
-    for val, ci, marker, offset, ha in zip(ir_vals, ir_cis, IR_MARKERS, IR_OFFSETS, IR_HALIGNS):
+    # Inter-rater column — 3 pairwise bars + 1 averaged (mean) bar
+    ir_x     = n_metrics
+    ir_vals  = interrater[corr_key]
+    ir_cis   = interrater[f"{corr_key}_ci"]
+    for val, ci, marker, offset in zip(
+            ir_vals, ir_cis, IR_PAIR_MARKERS, IR_PAIR_OFFSETS):
         lo, hi = ci
-        yerr = [[val - lo], [hi - val]]
         ax.errorbar(ir_x + offset, val,
-                    yerr=yerr,
+                    yerr=[[val - lo], [hi - val]],
                     fmt=marker,
                     color=IR_COLOR,
-                    markersize=11, markeredgewidth=0.6,
-                    capsize=4, capthick=1.5, elinewidth=1.5,
+                    markersize=IR_PAIR_SIZE, markeredgewidth=1.0,
+                    capsize=7, capthick=2.0, elinewidth=2.0,
                     zorder=3)
-        ax.text(ir_x + offset, hi + 0.012, f"{val:.2f}",
-                ha=ha, va="bottom", fontsize=13,
-                fontweight="normal", color=IR_COLOR, zorder=5)
+
+    ir_mean = np.mean(ir_vals)
+    ir_lo   = np.mean([c[0] for c in ir_cis])
+    ir_hi   = np.mean([c[1] for c in ir_cis])
+    ax.errorbar(
+        ir_x + IR_AVG_OFFSET, ir_mean,
+        yerr=[[ir_mean - ir_lo], [ir_hi - ir_mean]],
+        fmt="*",
+        color=IR_COLOR,
+        markersize=IR_AVG_SIZE,
+        markeredgewidth=1.0,
+        markeredgecolor="white",
+        capsize=7, capthick=2.0, elinewidth=2.0,
+        zorder=4,
+    )
+    ax.text(ir_x + IR_AVG_OFFSET, ir_hi + 0.018, f"{ir_mean:.2f}",
+            ha="center", va="bottom", fontsize=FS_VALUE_AVG,
+            fontweight="bold", color=IR_COLOR, zorder=5)
 
 # X-axis tick labels
 ax_xticks  = list(range(n_metrics)) + [n_metrics]
 ax_xlabels = metric_names + ["Inter-rater"]
 for ax in axes:
     ax.set_xticks(ax_xticks)
-    ax.set_xticklabels(ax_xlabels, fontsize=15, fontweight="bold")
+    ax.set_xticklabels(ax_xlabels, fontsize=FS_XLABEL, fontweight="bold",
+                       rotation=45, ha="right")
+    ax.tick_params(axis="x", labelsize=FS_XLABEL, width=1.5, length=6)
     ax.set_xlim(-0.65, n_metrics + 0.75)
 
-# Legend
 legend_elements = [
     plt.Line2D([0], [0], marker="o", color="w", markerfacecolor=DARK_RED,
-               markersize=13, label="Rater 1"),
+               markersize=16, label="Rater 1"),
     plt.Line2D([0], [0], marker="s", color="w", markerfacecolor=DARK_RED,
-               markersize=13, label="Rater 2"),
+               markersize=16, label="Rater 2"),
     plt.Line2D([0], [0], marker="D", color="w", markerfacecolor=DARK_RED,
-               markersize=13, label="Rater 3"),
+               markersize=16, label="Rater 3"),
     plt.Line2D([0], [0], marker="*", color="w", markerfacecolor=DARK_RED,
-               markersize=19, label="Averaged"),
+               markersize=22, label="Averaged"),
     plt.Line2D([0], [0], marker="o", color="w", markerfacecolor=IR_COLOR,
-               markersize=13, label="Rater 1 vs Rater 2"),
+               markersize=16, label="Rater 1 vs Rater 2"),
     plt.Line2D([0], [0], marker="D", color="w", markerfacecolor=IR_COLOR,
-               markersize=13, label="Rater 1 vs Rater 3"),
+               markersize=16, label="Rater 1 vs Rater 3"),
     plt.Line2D([0], [0], marker="^", color="w", markerfacecolor=IR_COLOR,
-               markersize=13, label="Rater 2 vs Rater 3"),
+               markersize=16, label="Rater 2 vs Rater 3"),
+    plt.Line2D([0], [0], marker="*", color="w", markerfacecolor=IR_COLOR,
+               markersize=22, markeredgecolor=IR_COLOR,
+               label="Inter-rater (averaged)"),
 ]
 fig.legend(
     handles=legend_elements,
     loc="lower center",
-    bbox_to_anchor=(0.44, 0.0),
+    bbox_to_anchor=(0.5, 0.02),
     ncol=4,
-    fontsize=14,
     framealpha=1.0,
     edgecolor="#aaaaaa",
-    handlelength=1.4,
-    handletextpad=0.7,
-    columnspacing=1.2,
-    prop={"size": 14, "weight": "bold"},
+    handlelength=1.8,
+    handletextpad=1.0,
+    columnspacing=2.2,
+    labelspacing=1.4,
+    borderpad=0.8,
+    prop={"size": FS_LEGEND, "weight": "bold"},
 )
 
-out_path = OUT_DIR / "radpref_correlation_with_icare.png"
-plt.savefig(out_path, dpi=600, bbox_inches="tight")
-print(f"\nFigure 1 saved: {out_path}")
+out_png = OUT_DIR / "radpref_correlation_with_icare.png"
+out_pdf = OUT_DIR / "radpref_correlation_with_icare.pdf"
+plt.savefig(out_png, dpi=600, bbox_inches="tight", pad_inches=0.3)
+plt.savefig(out_pdf, dpi=600, bbox_inches="tight", pad_inches=0.3)
+print(f"\nFigure 1 saved: {out_png}")
+print(f"Figure 1 saved: {out_pdf}")
 plt.close()
 
 # ===========================================================================
@@ -343,9 +384,10 @@ icare_avg_C2  = combined.loc[range(N, 2*N), "icare"].values
 icare_pred_C1 = pred_df.loc[range(0, N), "Agreement_Percentage"].values
 icare_pred_C2 = pred_df.loc[range(N, 2*N), "Agreement_Percentage"].values
 crimson_C1, crimson_C2 = crimson_scores[:N], crimson_scores[N:]
-green_C1  = green_df["green_score"].values[:N];   green_C2  = green_df["green_score"].values[N:]
-bert_C1   = rrg_df["bertscore"].values[:N];       bert_C2   = rrg_df["bertscore"].values[N:]
-chex_C1   = rrg_df["semb_score"].values[:N];      chex_C2   = rrg_df["semb_score"].values[N:]
+green_C1  = green_df["green_score"].values[:N];         green_C2  = green_df["green_score"].values[N:]
+as_C1     = alignscore_df["alignscore"].values[:N];     as_C2     = alignscore_df["alignscore"].values[N:]
+bert_C1   = rrg_df["bertscore"].values[:N];             bert_C2   = rrg_df["bertscore"].values[N:]
+semb_C1   = rrg_df["semb_score"].values[:N];      semb_C2   = rrg_df["semb_score"].values[N:]
 rg_C1     = rrg_df["radgraph_combined"].values[:N]; rg_C2   = rrg_df["radgraph_combined"].values[N:]
 bleu_C1   = rrg_df["bleu_score"].values[:N];      bleu_C2   = rrg_df["bleu_score"].values[N:]
 rcq_C1    = -rrg_df["RadCliQ-v1"].values[:N];     rcq_C2    = -rrg_df["RadCliQ-v1"].values[N:]  # negated: RadCliQ is an error metric (higher=worse)
@@ -356,8 +398,9 @@ FOREST_METRICS = [
     ("ICARE_PREDEFINED",  icare_pred_C1, icare_pred_C2),
     ("CRIMSON",           crimson_C1,    crimson_C2),
     ("GREEN",             green_C1,      green_C2),
+    ("AlignScore",        as_C1,         as_C2),
     ("BERTScore",         bert_C1,       bert_C2),
-    ("CheXbert",          chex_C1,       chex_C2),
+    ("SembScore",         semb_C1,       semb_C2),
     ("RadGraph",          rg_C1,         rg_C2),
     ("BLEU",              bleu_C1,       bleu_C2),
     ("RadCliQ-v1",        rcq_C1,        rcq_C2),
@@ -491,10 +534,14 @@ def build_consensus(rater_prefs_dict, threshold):
                  if rater_prefs_dict[uid][i] != 0]
         if not prefs:
             continue
-        vote_sum = sum(prefs)
-        if abs(vote_sum) >= threshold:
+        c1_votes = sum(1 for p in prefs if p > 0)
+        c2_votes = sum(1 for p in prefs if p < 0)
+        if c1_votes >= threshold:
             decisive_idx.append(i)
-            consensus_sign.append(int(np.sign(vote_sum)))
+            consensus_sign.append(1)
+        elif c2_votes >= threshold:
+            decisive_idx.append(i)
+            consensus_sign.append(-1)
     return np.array(decisive_idx), np.array(consensus_sign)
 
 dec_idx, dec_cons = build_consensus(rater_prefs, 2)
@@ -562,3 +609,110 @@ plt.tight_layout()
 out3 = OUT_DIR / "forest_plot_decisive_consensus.png"
 plt.savefig(out3, dpi=600, bbox_inches="tight")
 print(f"\nFigure 3 saved: {out3}")
+
+
+
+# ============================================================
+# CSV EXPORT — RadPref forest plots
+# Add these blocks at the END of plot_radpref_correlation.py
+# (after the existing Figure 2 and Figure 3 code)
+# All variables are already computed in the script.
+# ============================================================
+
+import pandas as pd
+
+# ────────────────────────────────────────────────────────────
+# EXPORT A: panel_radpref_forest_per_rater.csv
+# Source: forest_per_rater  (computed just before Figure 2)
+# Columns: metric, mean, ci_lo, ci_hi, rater_1, rater_2, rater_3,
+#          inter_rater_pct
+# ────────────────────────────────────────────────────────────
+
+rows_rp_forest = []
+for row in forest_per_rater:
+    d = {
+        "metric":          row["label"],
+        "mean":            round(row["mean"], 4),
+        "ci_lo":           round(row["lo"],   4),
+        "ci_hi":           round(row["hi"],   4),
+        "inter_rater_pct": round(inter_rater_pct, 1),
+    }
+    for ri, pct in enumerate(row["pcts"]):
+        d[f"rater_{ri+1}"] = round(pct, 4)   # rater_1, rater_2, rater_3
+    rows_rp_forest.append(d)
+
+df_rp_forest = pd.DataFrame(rows_rp_forest)
+df_rp_forest.to_csv(OUT_DIR / "panel_radpref_forest_per_rater.csv", index=False)
+print("Saved panel_radpref_forest_per_rater.csv")
+print(df_rp_forest.to_string(index=False))
+
+
+# ────────────────────────────────────────────────────────────
+# EXPORT B: panel_radpref_forest_decisive.csv
+# Source: forest_data  (computed just before Figure 3)
+# Columns: metric, pct, ci_lo, ci_hi, n_decisive, threshold
+# ────────────────────────────────────────────────────────────
+
+rows_rp_dec = []
+for row in forest_data:
+    rows_rp_dec.append({
+        "metric":     row["label"],
+        "pct":        round(row["pct"], 4),
+        "ci_lo":      round(row["lo"],  4),
+        "ci_hi":      round(row["hi"],  4),
+        "n_decisive": N_DECISIVE,
+        "threshold":  THRESHOLD,
+    })
+
+df_rp_dec = pd.DataFrame(rows_rp_dec)
+df_rp_dec.to_csv(OUT_DIR / "panel_radpref_forest_decisive.csv", index=False)
+print("\nSaved panel_radpref_forest_decisive.csv")
+print(df_rp_dec.to_string(index=False))
+
+
+# ────────────────────────────────────────────────────────────
+# EXPORT C: panel_radpref_correlation.csv
+# Source: computed  (variable name in THIS script)
+# RadPref has no candidate loop — correlations are per rater
+# (rater_labels = ["Rater 1", "Rater 2", "Rater 3", "Averaged"])
+# One row per (metric, rater)
+# Columns: metric, rater, kendall_tau, kendall_lo, kendall_hi,
+#          pearson_r, pearson_lo, pearson_hi
+# Note: RaTEScore has no CIs (hard-coded), filled with nan
+# ────────────────────────────────────────────────────────────
+
+rater_labels_export = ["Rater 1", "Rater 2", "Rater 3", "Averaged"]
+
+rows_rp_corr = []
+for label in paper:
+    clean_label = label.replace("\n", " ")   # "ICARE\n(predefined)" → "ICARE (predefined)"
+    for ri, rater in enumerate(rater_labels_export):
+        if label in computed and "kendall_ci" in computed[label]:
+            c = computed[label]
+            rows_rp_corr.append({
+                "metric":      clean_label,
+                "rater":       rater,
+                "kendall_tau": round(c["kendall"][ri],       4),
+                "kendall_lo":  round(c["kendall_ci"][ri][0], 4),
+                "kendall_hi":  round(c["kendall_ci"][ri][1], 4),
+                "pearson_r":   round(c["pearson"][ri],       4),
+                "pearson_lo":  round(c["pearson_ci"][ri][0], 4),
+                "pearson_hi":  round(c["pearson_ci"][ri][1], 4),
+            })
+        else:
+            # RaTEScore: hard-coded point estimates, no CI
+            rows_rp_corr.append({
+                "metric":      clean_label,
+                "rater":       rater,
+                "kendall_tau": paper[label]["kendall"][ri],
+                "kendall_lo":  float("nan"),
+                "kendall_hi":  float("nan"),
+                "pearson_r":   paper[label]["pearson"][ri],
+                "pearson_lo":  float("nan"),
+                "pearson_hi":  float("nan"),
+            })
+
+df_rp_corr = pd.DataFrame(rows_rp_corr)
+df_rp_corr.to_csv(OUT_DIR / "panel_radpref_correlation.csv", index=False)
+print("\nSaved panel_radpref_correlation.csv")
+print(df_rp_corr.to_string(index=False))

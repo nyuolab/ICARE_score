@@ -95,7 +95,7 @@ LEGEND_LABELS = {
     "bertscore": "BERTScore-sel",
     "bleu":      "BLEU-sel",
     "radgraph":  "RadGraph-sel",
-    "s_emb":     "S-Emb-sel",
+    "s_emb":     "SembScore-sel",
 }
 
 n_metrics = len(labels)

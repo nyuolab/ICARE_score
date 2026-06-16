@@ -78,7 +78,8 @@ def create_separate_plots(data_dict, output_dir='plots'):
         #                 xytext=(0,-15), ha='center', color='red')
         
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'agreement_vs_perturbation_{model_name}.png'), dpi=600)
+        safe_name = model_name.replace('/', '_')
+        plt.savefig(os.path.join(output_dir, f'agreement_vs_perturbation_{safe_name}.png'), dpi=600)
         plt.close()
 
 def create_combined_plot(data_dict, output_dir='plots'):
@@ -193,7 +194,8 @@ def create_separate_report_level_plots(data_dict, output_dir='plots'):
         plt.legend(fontsize=24, prop={'weight': 'bold', 'size': 16})
         
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'report_level_agreement_{model_name}.png'), bbox_inches='tight', dpi=600)
+        safe_name = model_name.replace('/', '_')
+        plt.savefig(os.path.join(output_dir, f'report_level_agreement_{safe_name}.png'), bbox_inches='tight', dpi=600)
         plt.close()
 
 def create_combined_report_level_plot(data_dict, output_dir='plots'):
@@ -234,6 +236,68 @@ def create_combined_report_level_plot(data_dict, output_dir='plots'):
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, 'combined_report_level_plot.png'), dpi=600)
     plt.close()
+
+def save_plot_data_csv(data_dict, perturbation_type, output_dir, dataset):
+    """
+    Save all plotted values to a single CSV so every plot can be reproduced.
+    One row per (model, perturbation_type, question_source, perturbation_intensity).
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    rows = []
+
+    for model_name, model_data in data_dict.items():
+        # --- dataset-level (agreement_percentage) ---
+        for qs_key, label in [('gt_ques', 'gt_ques'), ('gen_ques', 'gen_ques')]:
+            intensities, agreements = model_data[qs_key]
+            for intensity, agreement in zip(intensities, agreements):
+                rows.append({
+                    'dataset': dataset,
+                    'model': model_name,
+                    'perturbation_type': perturbation_type,
+                    'question_source': label,
+                    'perturbation_intensity': intensity,
+                    'agreement_percentage': agreement,
+                    'mean_agreement': None,
+                    'std_deviation': None,
+                })
+
+        # --- report-level (mean ± std) ---
+        for qs_key, label in [('gt_ques_report', 'gt_ques'), ('gen_ques_report', 'gen_ques')]:
+            intensities, means, stds = model_data[qs_key]
+            for intensity, mean, std in zip(intensities, means, stds):
+                # find existing row to fill in, else add new one
+                match = next(
+                    (r for r in rows
+                     if r['model'] == model_name
+                     and r['perturbation_type'] == perturbation_type
+                     and r['question_source'] == label
+                     and r['perturbation_intensity'] == intensity
+                     and r['mean_agreement'] is None),
+                    None
+                )
+                if match:
+                    match['mean_agreement'] = mean
+                    match['std_deviation'] = std
+                else:
+                    rows.append({
+                        'dataset': dataset,
+                        'model': model_name,
+                        'perturbation_type': perturbation_type,
+                        'question_source': label,
+                        'perturbation_intensity': intensity,
+                        'agreement_percentage': None,
+                        'mean_agreement': mean,
+                        'std_deviation': std,
+                    })
+
+    csv_path = os.path.join(output_dir, 'plot_data.csv')
+    pd.DataFrame(rows, columns=[
+        'dataset', 'model', 'perturbation_type', 'question_source',
+        'perturbation_intensity', 'agreement_percentage',
+        'mean_agreement', 'std_deviation',
+    ]).to_csv(csv_path, index=False)
+    print(f"Saved plot data to {csv_path}")
+
 
 def main():
     parser = argparse.ArgumentParser(description='Plot agreement with perturbation stats')
@@ -339,6 +403,7 @@ def main():
         create_combined_plot(data_dict, output_dir=output_path)
         create_separate_report_level_plots(data_dict, output_dir=output_path)
         create_combined_report_level_plot(data_dict, output_dir=output_path)
+        save_plot_data_csv(data_dict, perturbation_type, output_dir=output_path, dataset=dataset)
 
 if __name__ == "__main__":
     main() 
