@@ -28,6 +28,7 @@ from scipy import stats
 # ---------------------------------------------------------------------------
 BASE      = Path("/gpfs/data/oermannlab/users/rd3571")
 EVAL_DIR  = BASE / "ICARE_score/outputs/rexval/rexval_test_200/eval_seed_123/shuffled_ans_choices_data"
+SEQ_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200/eval_seed_123_sequential_b10/shuffled_ans_choices_data"
 PRED_DIR  = BASE / "ICARE_score/outputs/rexval/predefined/eval_seed_123/mcqa_eval"
 BASELINES = BASE / "ICARE_score/outputs/rexval/rexval_test_200/baselines"
 REXVAL_CSV = BASE / "cxr_report_datasets/rexval/RexVal_test_icare_200.csv"
@@ -39,6 +40,9 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 N_BOOT = 2000
 RNG    = np.random.default_rng(42)
+# Isolated stream for the new ICARE_SEQ variant so its bootstrap draws never
+# shift the shared RNG's position and perturb already-reported metrics' CIs.
+RNG_SEQ = np.random.default_rng(42)
 CANDIDATES = ["radgraph", "bertscore", "s_emb", "bleu"]
 CAND_LABELS = {"radgraph": "RadGraph", "bertscore": "BERTScore",
                "s_emb": "SembScore", "bleu": "BLEU"}
@@ -84,6 +88,16 @@ ap_gen = gen_stats.loc[range(200), "Agreement_Percentage"].values
 ap_avg = (ap_gt + ap_gen) / 2
 
 # ---------------------------------------------------------------------------
+# Load ICARE (shuffled, sequential MCQ generation) — gt, gen, avg
+# ---------------------------------------------------------------------------
+gt_stats_seq  = pd.read_csv(SEQ_EVAL_DIR / "gt_reports_as_ref/mcqa_eval/mcq_eval_report_level_stats.csv").set_index("Report_ID")
+gen_stats_seq = pd.read_csv(SEQ_EVAL_DIR / "gen_reports_as_ref/mcqa_eval/mcq_eval_report_level_stats.csv").set_index("Report_ID")
+
+ap_gt_seq  = gt_stats_seq.loc[range(200), "Agreement_Percentage"].values
+ap_gen_seq = gen_stats_seq.loc[range(200), "Agreement_Percentage"].values
+ap_seq     = (ap_gt_seq + ap_gen_seq) / 2
+
+# ---------------------------------------------------------------------------
 # Load ICARE predefined
 # ---------------------------------------------------------------------------
 pred_stats = pd.read_csv(PRED_DIR / "mcq_eval_report_level_stats.csv").set_index("Report_ID")
@@ -125,6 +139,7 @@ merged = rexval_df[["row_id", "study_number", "origin"]].copy()
 merged["ap_gt"]     = ap_gt
 merged["ap_gen"]    = ap_gen
 merged["ap_avg"]    = ap_avg
+merged["ap_seq"]    = ap_seq
 merged["ap_pred"]   = ap_pred
 merged["crimson"]    = crimson_scores
 merged["green"]      = green_scores
@@ -143,6 +158,7 @@ merged = merged.merge(error_scores, on=["study_number", "origin"], how="left")
 merged["dis_gt"]      = 1 - merged["ap_gt"]   / 100
 merged["dis_gen"]     = 1 - merged["ap_gen"]  / 100
 merged["dis_avg"]     = 1 - merged["ap_avg"]  / 100
+merged["dis_seq"]     = 1 - merged["ap_seq"]  / 100
 merged["dis_pred"]    = 1 - merged["ap_pred"] / 100
 merged["neg_crimson"]    = -merged["crimson"]
 merged["neg_green"]      = -merged["green"]
@@ -156,16 +172,17 @@ merged["neg_rg"]      = -merged["radgraph"]
 # ---------------------------------------------------------------------------
 # Correlation helpers
 # ---------------------------------------------------------------------------
-def bootstrap_ci(x, y, stat_fn, n=N_BOOT):
+def bootstrap_ci(x, y, stat_fn, n=N_BOOT, rng=None):
+    rng   = RNG if rng is None else rng
     idx   = np.arange(len(x))
     boots = []
     for _ in range(n):
-        s = RNG.choice(idx, size=len(idx), replace=True)
+        s = rng.choice(idx, size=len(idx), replace=True)
         boots.append(stat_fn(x[s], y[s]))
     lo, hi = np.percentile(boots, [2.5, 97.5])
     return lo, hi
 
-def compute_corr_by_cand(df, score_col):
+def compute_corr_by_cand(df, score_col, rng=None):
     """Compute Kendall τ and Pearson r vs errors for each candidate type."""
     results = {}
     for cand in CANDIDATES:
@@ -174,8 +191,8 @@ def compute_corr_by_cand(df, score_col):
         y = sub["mean_clin_sig_errors"].values
         tau = stats.kendalltau(x, y)[0]
         r   = stats.pearsonr(x, y)[0]
-        tau_lo, tau_hi = bootstrap_ci(x, y, lambda a, b: stats.kendalltau(a, b)[0])
-        r_lo,   r_hi   = bootstrap_ci(x, y, lambda a, b: stats.pearsonr(a, b)[0])
+        tau_lo, tau_hi = bootstrap_ci(x, y, lambda a, b: stats.kendalltau(a, b)[0], rng=rng)
+        r_lo,   r_hi   = bootstrap_ci(x, y, lambda a, b: stats.pearsonr(a, b)[0], rng=rng)
         results[cand] = dict(tau=tau, r=r,
                              tau_lo=tau_lo, tau_hi=tau_hi,
                              r_lo=r_lo, r_hi=r_hi)
@@ -192,13 +209,15 @@ CORR_METRICS = [
     ("AlignScore",       "neg_alignscore"),
     ("CRIMSON",          "neg_crimson"),
     ("ICARE_AVG",        "dis_avg"),
+    ("ICARE_SEQ",        "dis_seq"),
     ("ICARE_PREDEFINED", "dis_pred"),
 ]
 
 print("Computing correlations (Kendall τ / Pearson r vs clinically significant errors)...")
 corr_results = {}
 for label, col in CORR_METRICS:
-    corr_results[label] = compute_corr_by_cand(merged, col)
+    rng = RNG_SEQ if label == "ICARE_SEQ" else None
+    corr_results[label] = compute_corr_by_cand(merged, col, rng=rng)
     avg_tau = np.mean([corr_results[label][c]["tau"] for c in CANDIDATES])
     avg_r   = np.mean([corr_results[label][c]["r"]   for c in CANDIDATES])
     print(f"  {label:22s}: avg τ={avg_tau:.3f}  avg r={avg_r:.3f}")
@@ -264,6 +283,7 @@ def latex_fmt_highlight(val, lo, hi, rank):
 
 LATEX_LABELS = {
     "ICARE_AVG":        r"\textbf{ICARE}$_{\textbf{AVG}}$",
+    "ICARE_SEQ":        r"\textbf{ICARE}$_{\textbf{SEQ}}$",
     "ICARE_PREDEFINED": r"\textbf{ICARE}$_{\textbf{PRE}}$",
     "CRIMSON":          r"CRIMSON*",
 }
@@ -452,6 +472,7 @@ def get_metric_top1(df_merged, col, ascending):
 # (label, score_col, ascending) — ascending=True means lower score = better
 FOREST_METRICS = [
     ("ICARE_AVG ◄",       "ap_avg",    False),
+    ("ICARE_SEQ",         "ap_seq",    False),
     ("ICARE_PREDEFINED",  "ap_pred",   False),
     ("CRIMSON",           "crimson",    False),
     ("GREEN",             "green",      False),
@@ -469,8 +490,13 @@ N_STUDIES = 50
 # Bootstrap across studies (n=50) for stable CIs
 # ---------------------------------------------------------------------------
 print("\nPer-rater alignment (bootstrap across studies):")
+# rater_top1_by_rater doesn't change across metrics/bootstraps — index once.
+rater_series_by_rater = {
+    r: rater_top1_by_rater[r].set_index("study_number")["rater_winner"] for r in RATERS
+}
 forest_per_rater = []
 for label, col, asc in FOREST_METRICS:
+    rater_rng = RNG_SEQ if label == "ICARE_SEQ" else RNG
     metric_top1 = get_metric_top1(merged, col, asc)
     per_rater_pcts = []
     for rater in RATERS:
@@ -485,16 +511,17 @@ for label, col, asc in FOREST_METRICS:
     all_sets = [set(rater_top1_by_rater[r]["study_number"]) for r in RATERS] + [set(m1_idx.index)]
     common_arr = np.array(sorted(set.intersection(*all_sets)))
 
+    # Align to common_arr once per metric — plain numpy arrays for fast bootstrap indexing
+    metric_arr = m1_idx.loc[common_arr, "metric_winner"].values
+    rater_arrs = {r: rater_series_by_rater[r].loc[common_arr].values for r in RATERS}
+
     # Bootstrap across studies — resample positionally from common_arr
     boot_means = []
     for _ in range(N_BOOT):
-        pos     = RNG.choice(len(common_arr), len(common_arr), replace=True)
-        sampled = common_arr[pos]
+        pos = rater_rng.choice(len(common_arr), len(common_arr), replace=True)
         boot_per_rater = []
         for rater in RATERS:
-            df_r = rater_top1_by_rater[rater].set_index("study_number")
-            hits = (df_r.loc[sampled, "rater_winner"].values
-                    == m1_idx.loc[sampled, "metric_winner"].values)
+            hits = rater_arrs[rater][pos] == metric_arr[pos]
             boot_per_rater.append(hits.mean() * 100)
         boot_means.append(np.mean(boot_per_rater))
 
@@ -597,11 +624,12 @@ THRESHOLD = 4
 decisive_df, N_DECISIVE = build_decisive_consensus(THRESHOLD)
 print(f"\nDecisive cases (≥{THRESHOLD}/6 raters agree on top-1): n={N_DECISIVE}")
 
-def consensus_alignment_ci(metric_top1_df, dec_df, n_boot=N_BOOT):
+def consensus_alignment_ci(metric_top1_df, dec_df, n_boot=N_BOOT, rng=None):
+    rng = RNG if rng is None else rng
     df = dec_df.merge(metric_top1_df, on="study_number")
     hits = (df["rater_winner"] == df["metric_winner"]).values.astype(float)
     pct  = hits.mean() * 100
-    boots = [RNG.choice(hits, len(hits), replace=True).mean() * 100
+    boots = [rng.choice(hits, len(hits), replace=True).mean() * 100
              for _ in range(n_boot)]
     lo, hi = np.percentile(boots, [2.5, 97.5])
     return pct, lo, hi
@@ -610,7 +638,8 @@ print(f"\nDecisive-consensus alignment (≥{THRESHOLD}/6, n={N_DECISIVE}):")
 forest_consensus = []
 for label, col, asc in FOREST_METRICS:
     metric_top1 = get_metric_top1(merged, col, asc)
-    pct, lo, hi = consensus_alignment_ci(metric_top1, decisive_df)
+    pct, lo, hi = consensus_alignment_ci(
+        metric_top1, decisive_df, rng=(RNG_SEQ if label == "ICARE_SEQ" else None))
     forest_consensus.append(dict(label=label, pct=pct, lo=lo, hi=hi))
     print(f"  {label:22s}: {pct:.1f}%  [{lo:.1f}, {hi:.1f}]")
 

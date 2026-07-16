@@ -118,10 +118,117 @@ def parse_mcq(mcq_text):
     
     return questions
 
+def build_mcq_prompt(report, batch_n, previous_questions):
+    """Build the MCQ-generation prompt.
+
+    Identical to the original single-shot prompt when there are no
+    previous_questions. Otherwise prepends the already-asked questions and
+    adds one instruction to cover what's missing -- every other word of the
+    original instructions is unchanged.
+    """
+    prefix = ""
+    extra_instruction = ""
+    if previous_questions:
+        prefix = "Questions already generated for this report:\n" + \
+                 "\n".join(f"- {q}" for q in previous_questions) + "\n\n"
+        extra_instruction = "Do not repeat the questions listed above; cover parts of the report not addressed by them."
+
+    return (
+        prefix +
+        f"Please generate {batch_n} different multiple choice question answer pairs for the following radiology report: {report}. "
+        "The questions should be based on report and cannot be answered without the report."
+        f"{extra_instruction}"
+        "Please use the following format exactly as your life depends on sticking to these formats.:\n\n"
+        "**1: [Question text]**\n"
+        "A) [Option A]\n"
+        "B) [Option B]\n"
+        "C) [Option C]\n"
+        "D) [Option D]\n"
+        "Answer: [Correct answer]\n\n"
+    )
+
+
+def generate_mcqs_sequential(report, num_ques, batch_size, stop_threshold, url, api_key,
+                              timeout, max_tokens, temperature, top_p, n, seed, model_name):
+    """Generate MCQs for one report in sequential, context-aware batches.
+
+    Each round asks for up to `batch_size` new questions and is shown the
+    questions already collected so far. Stops once `num_ques` is reached, or
+    once `stop_threshold` consecutive rounds are "stalled" -- either the
+    model attempted fewer raw question blocks than requested (checked before
+    format-validation, so a formatting slip in an otherwise content-rich
+    round isn't mistaken for the report having run out of distinct content),
+    or it attempted a full batch but none of it parsed into a valid
+    question (guards against a report whose completions consistently fail
+    to parse looping forever without ever tripping the raw-count check).
+    """
+    collected = []
+    consecutive_short = 0
+
+    while len(collected) < num_ques:
+        batch_n = min(batch_size, num_ques - len(collected))
+        prompt = build_mcq_prompt(report, batch_n, [q["question_text"] for q in collected])
+
+        try:
+            response = make_llama_request(
+                prompt=prompt,
+                url=url,
+                api_key=api_key,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=timeout,
+                model=model_name,
+                seed=seed,
+                top_p=top_p,
+                n=n,
+                stream=False,
+            )
+        except Timeout:
+            print(f"Request timed out for report: {report[:50]}...")
+            break
+        except Exception as e:
+            print(f"Error processing report: {e}")
+            break
+
+        if not response:
+            break
+
+        mcq_text = response["choices"][0]["message"]["content"]
+        raw_blocks = [b for b in mcq_text.split('\n\n') if b.strip()]
+
+        parsed_mcqs = parse_mcq(mcq_text)
+        valid_new = [
+            mcq for mcq in parsed_mcqs
+            if mcq["question_text"] and all(mcq["options"].values()) and mcq["correct_answer"]
+        ][:batch_n]
+
+        for mcq in valid_new:
+            mcq["question_id"] = len(collected)
+            collected.append(mcq)
+
+        # A round is "stalled" if it under-attempted (raw signal: model
+        # believes there's less content left) OR made zero real progress
+        # (no valid questions added, even if it attempted a full batch --
+        # otherwise a report whose completions consistently fail to parse
+        # could attempt a full batch every round forever without ever
+        # tripping the raw-count check).
+        stalled = (len(raw_blocks) < batch_n) or (len(valid_new) == 0)
+        consecutive_short = consecutive_short + 1 if stalled else 0
+
+        print(f"    round: requested={batch_n} raw_attempted={len(raw_blocks)} valid_added={len(valid_new)} "
+              f"collected={len(collected)}/{num_ques} stalled={stalled} consecutive_stalled={consecutive_short}",
+              flush=True)
+
+        if consecutive_short >= stop_threshold:
+            break
+
+    return collected
+
+
 def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
-    api_key=Config.API_KEY, timeout=Config.GENERATION_TIMEOUT, max_tokens=Config.GENERATION_MAX_TOKENS, 
-    temperature=Config.DEFAULT_TEMPERATURE, top_p=Config.DEFAULT_TOP_P, n=Config.DEFAULT_N, seed=Config.DEFAULT_SEED, model_name=Config.MODEL_NAME):
-    """Generate MCQs for given reports and write them to file."""
+    api_key=Config.API_KEY, timeout=Config.GENERATION_TIMEOUT, max_tokens=Config.GENERATION_MAX_TOKENS,
+    temperature=Config.DEFAULT_TEMPERATURE, top_p=Config.DEFAULT_TOP_P, n=Config.DEFAULT_N, seed=Config.DEFAULT_SEED, model_name=Config.MODEL_NAME,
+    use_sequential_generation=False, sequential_batch_size=10, sequential_stop_threshold=2):
     """Generate MCQs for given reports and write them to file."""
     try:
         # Set base random seed
@@ -137,64 +244,73 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
             file.write('"mcq_data": [\n')
 
             for i, report in enumerate(reports):
-                # Generate MCQs until we have num_ques in the desired format
-                formatted_mcqs = []
-                while len(formatted_mcqs) < num_ques:
-                    messages = [{
-                        "role": "user",
-                        "content": (
-                            f"Please generate {num_ques} different multiple choice question answer pairs for the following radiology report: {report}. "
-                            "The questions should be based on report and cannot be answered without the report."
-                            "Please use the following format exactly as your life depends on sticking to these formats.:\n\n"
-                            "**1: [Question text]**\n"
-                            "A) [Option A]\n"
-                            "B) [Option B]\n"
-                            "C) [Option C]\n"
-                            "D) [Option D]\n"
-                            "Answer: [Correct answer]\n\n"
-                        )
-                    }]
-                    
-                    try:
-                        response = make_llama_request(
-                            prompt=messages[0]["content"],
-                            url=url,
-                            api_key=api_key,
-                            max_tokens=max_tokens,
-                            temperature=temperature,
-                            timeout=timeout,
-                            model=model_name,
-                            seed=seed,
-                            top_p=top_p,
-                            n=n,
-                            stream=False,
-                            # stop="string",
-                            # frequency_penalty=0
-                        )
-                        
-                        if response:
-                            mcq_data = response["choices"][0]["message"]["content"]
-                            parsed_mcqs = parse_mcq(mcq_data)
-                            
-                            # Only add MCQs that are in the desired format
-                            for mcq in parsed_mcqs:
-                                if (mcq["question_text"] and 
-                                    all(mcq["options"].values()) and 
-                                    mcq["correct_answer"]):
-                                    formatted_mcqs.append(mcq)
-                                    
-                                if len(formatted_mcqs) >= num_ques:
-                                    break
+                print(f"[report {i+1}/{len(reports)}]", flush=True)
+                if use_sequential_generation:
+                    formatted_mcqs = generate_mcqs_sequential(
+                        report, num_ques, sequential_batch_size, sequential_stop_threshold,
+                        url, api_key, timeout, max_tokens, temperature, top_p, n, seed, model_name
+                    )
+                else:
+                    # Generate MCQs until we have num_ques in the desired format
+                    formatted_mcqs = []
+                    while len(formatted_mcqs) < num_ques:
+                        messages = [{
+                            "role": "user",
+                            "content": (
+                                f"Please generate {num_ques} different multiple choice question answer pairs for the following radiology report: {report}. "
+                                "The questions should be based on report and cannot be answered without the report."
+                                "Please use the following format exactly as your life depends on sticking to these formats.:\n\n"
+                                "**1: [Question text]**\n"
+                                "A) [Option A]\n"
+                                "B) [Option B]\n"
+                                "C) [Option C]\n"
+                                "D) [Option D]\n"
+                                "Answer: [Correct answer]\n\n"
+                            )
+                        }]
 
-                    except Timeout:
-                        print(f"Request timed out for report: {report[:50]}...")
-                        continue
-                    except Exception as e:
-                        print(f"Error processing report: {e}")
-                        continue
-                
-                # Check if we have num_ques valid MCQs
-                if len(formatted_mcqs) == num_ques:
+                        try:
+                            response = make_llama_request(
+                                prompt=messages[0]["content"],
+                                url=url,
+                                api_key=api_key,
+                                max_tokens=max_tokens,
+                                temperature=temperature,
+                                timeout=timeout,
+                                model=model_name,
+                                seed=seed,
+                                top_p=top_p,
+                                n=n,
+                                stream=False,
+                                # stop="string",
+                                # frequency_penalty=0
+                            )
+
+                            if response:
+                                mcq_data = response["choices"][0]["message"]["content"]
+                                parsed_mcqs = parse_mcq(mcq_data)
+
+                                # Only add MCQs that are in the desired format
+                                for mcq in parsed_mcqs:
+                                    if (mcq["question_text"] and
+                                        all(mcq["options"].values()) and
+                                        mcq["correct_answer"]):
+                                        formatted_mcqs.append(mcq)
+
+                                    if len(formatted_mcqs) >= num_ques:
+                                        break
+
+                        except Timeout:
+                            print(f"Request timed out for report: {report[:50]}...")
+                            continue
+                        except Exception as e:
+                            print(f"Error processing report: {e}")
+                            continue
+
+                # Legacy mode requires exactly num_ques (unchanged behavior);
+                # sequential mode keeps whatever was collected, even if partial.
+                should_write = (len(formatted_mcqs) > 0) if use_sequential_generation else (len(formatted_mcqs) == num_ques)
+                if should_write:
                     report_data = {
                         "report": report,
                         "questions": formatted_mcqs[:num_ques]  # Ensure we only take num_ques questions
@@ -203,7 +319,7 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
                     json.dump(report_data, file)
                     file.write(',\n' if i < len(reports) - 1 else '\n')
                     file.flush()
-                    total_mcqs += num_ques
+                    total_mcqs += len(formatted_mcqs[:num_ques])
                     total_reports_processed += 1
 
             # Write the closing of the JSON structure
@@ -289,6 +405,12 @@ def main():
     parser.add_argument('--reference', choices=['gt', 'gen'], default='gt', help='Reference type')
     parser.add_argument('--num_questions', type=int, default=40, help='Number of questions per report')
     parser.add_argument('--seed', type=int, default=123, help='Random seed for reproducibility')
+    parser.add_argument('--use_sequential_generation', action='store_true',
+        help='Generate questions in context-aware sequential batches instead of one single-shot request')
+    parser.add_argument('--sequential_batch_size', type=int, default=10,
+        help='Max questions requested per round in sequential generation mode (only used with --use_sequential_generation)')
+    parser.add_argument('--sequential_stop_threshold', type=int, default=2,
+        help='Consecutive under-attempted batches before stopping early in sequential mode (only used with --use_sequential_generation)')
 
     args = parser.parse_args()
 
@@ -328,7 +450,10 @@ def main():
         top_p=Config.DEFAULT_TOP_P,
         n=Config.DEFAULT_N,
         seed=seed,
-        model_name=Config.MODEL_NAME
+        model_name=Config.MODEL_NAME,
+        use_sequential_generation=args.use_sequential_generation,
+        sequential_batch_size=args.sequential_batch_size,
+        sequential_stop_threshold=args.sequential_stop_threshold
     )
     
     print(f"MCQs saved to {json_output_file}")

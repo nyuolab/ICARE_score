@@ -28,6 +28,7 @@ from scipy.stats import kendalltau, pearsonr
 # ---------------------------------------------------------------------------
 BASE = Path("/gpfs/data/oermannlab/users/rd3571")
 ICARE_SHUFFLED_OUT   = BASE / "ICARE_score/outputs/radpref/eval_seed_123/shuffled_ans_choices_data"
+ICARE_SEQ_OUT         = BASE / "ICARE_score/outputs/radpref/eval_seed_123_sequential_b10/shuffled_ans_choices_data"
 ICARE_PREDEFINED_OUT = BASE / "ICARE_score/outputs/radpref/predefined/eval_seed_123/mcqa_eval"
 BASELINES_DIR        = BASE / "ICARE_score/outputs/radpref/baselines"
 RADPREF_CSV          = BASE / "cxr_report_datasets/radpref/radpref_icare.csv"
@@ -37,6 +38,9 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 N_BOOT      = 2000
 RNG         = np.random.default_rng(42)
+# Isolated stream for the new ICARE_seq variant so its bootstrap draws never
+# shift the shared RNG's position and perturb already-reported metrics' CIs.
+RNG_SEQ     = np.random.default_rng(42)
 N           = 100   # cases per candidate (rows 0–99 = C1, rows 100–199 = C2)
 
 # ---------------------------------------------------------------------------
@@ -61,16 +65,17 @@ def corr_pair(x, y):
     r   = pearsonr(x, y)[0]
     return tau, r
 
-def bootstrap_ci(x, y, stat_fn, n=N_BOOT):
+def bootstrap_ci(x, y, stat_fn, n=N_BOOT, rng=None):
+    rng   = RNG if rng is None else rng
     idx   = np.arange(len(x))
     boots = []
     for _ in range(n):
-        s = RNG.choice(idx, size=len(idx), replace=True)
+        s = rng.choice(idx, size=len(idx), replace=True)
         boots.append(stat_fn(x[s], y[s]))
     lo, hi = np.percentile(boots, [2.5, 97.5])
     return lo, hi
 
-def compute_metric_corrs(score_diff, compute_ci=False):
+def compute_metric_corrs(score_diff, compute_ci=False, rng=None):
     """Kendall tau and Pearson r vs each rater (+ averaged). Optionally bootstrap CIs."""
     kendall_vals, pearson_vals = [], []
     kendall_cis,  pearson_cis  = [], []
@@ -79,8 +84,8 @@ def compute_metric_corrs(score_diff, compute_ci=False):
         kendall_vals.append(tau)
         pearson_vals.append(r)
         if compute_ci:
-            tau_lo, tau_hi = bootstrap_ci(score_diff, rd, lambda a, b: kendalltau(a, b)[0])
-            r_lo,   r_hi   = bootstrap_ci(score_diff, rd, lambda a, b: pearsonr(a, b)[0])
+            tau_lo, tau_hi = bootstrap_ci(score_diff, rd, lambda a, b: kendalltau(a, b)[0], rng=rng)
+            r_lo,   r_hi   = bootstrap_ci(score_diff, rd, lambda a, b: pearsonr(a, b)[0], rng=rng)
             kendall_cis.append((tau_lo, tau_hi))
             pearson_cis.append((r_lo,   r_hi))
     result = {"kendall": kendall_vals, "pearson": pearson_vals}
@@ -100,6 +105,16 @@ combined["icare"] = combined[["Agreement_Percentage_gt", "Agreement_Percentage_g
 icare_gt_diff  = combined.loc[range(0, N), "Agreement_Percentage_gt"].values  - combined.loc[range(N, 2*N), "Agreement_Percentage_gt"].values
 icare_gen_diff = combined.loc[range(0, N), "Agreement_Percentage_gen"].values - combined.loc[range(N, 2*N), "Agreement_Percentage_gen"].values
 icare_diff     = combined.loc[range(0, N), "icare"].values                    - combined.loc[range(N, 2*N), "icare"].values
+
+# ---------------------------------------------------------------------------
+# Load ICARE (shuffled, sequential MCQ generation) — gt, gen, and averaged
+# ---------------------------------------------------------------------------
+gt_df_seq  = pd.read_csv(ICARE_SEQ_OUT / "gt_reports_as_ref/mcqa_eval/mcq_eval_report_level_stats.csv").set_index("Report_ID")
+gen_df_seq = pd.read_csv(ICARE_SEQ_OUT / "gen_reports_as_ref/mcqa_eval/mcq_eval_report_level_stats.csv").set_index("Report_ID")
+combined_seq = gt_df_seq.join(gen_df_seq, how="left", lsuffix="_gt", rsuffix="_gen")
+combined_seq["icare_seq"] = combined_seq[["Agreement_Percentage_gt", "Agreement_Percentage_gen"]].mean(axis=1)
+
+icare_seq_diff = combined_seq.loc[range(0, N), "icare_seq"].values - combined_seq.loc[range(N, 2*N), "icare_seq"].values
 
 # ---------------------------------------------------------------------------
 # Load ICARE predefined (single Agreement_Percentage, no gt/gen split)
@@ -149,6 +164,7 @@ computed = {
     "CRIMSON":          compute_metric_corrs(crimson_diff,     compute_ci=True),
     "ICARE_predefined": compute_metric_corrs(icare_pred_diff,  compute_ci=True),
     "ICARE":            compute_metric_corrs(icare_diff,       compute_ci=True),
+    "ICARE_seq":        compute_metric_corrs(icare_seq_diff,   compute_ci=True, rng=RNG_SEQ),
 }
 
 rater_labels = ["Rater 1", "Rater 2", "Rater 3", "Averaged"]
@@ -196,6 +212,7 @@ paper = {
     "CRIMSON":             computed["CRIMSON"],
     "ICARE\n(predefined)": computed["ICARE_predefined"],
     "ICARE":               computed["ICARE"],
+    "ICARE\n(sequential)": computed["ICARE_seq"],
 }
 
 interrater = {
@@ -381,6 +398,8 @@ plt.close()
 # ---------------------------------------------------------------------------
 icare_avg_C1  = combined.loc[range(0, N), "icare"].values
 icare_avg_C2  = combined.loc[range(N, 2*N), "icare"].values
+icare_seq_C1  = combined_seq.loc[range(0, N), "icare_seq"].values
+icare_seq_C2  = combined_seq.loc[range(N, 2*N), "icare_seq"].values
 icare_pred_C1 = pred_df.loc[range(0, N), "Agreement_Percentage"].values
 icare_pred_C2 = pred_df.loc[range(N, 2*N), "Agreement_Percentage"].values
 crimson_C1, crimson_C2 = crimson_scores[:N], crimson_scores[N:]
@@ -395,6 +414,7 @@ rcq_C1    = -rrg_df["RadCliQ-v1"].values[:N];     rcq_C2    = -rrg_df["RadCliQ-v
 # (label, C1_scores, C2_scores) — higher score = better
 FOREST_METRICS = [
     ("ICARE_AVG ◄",      icare_avg_C1,  icare_avg_C2),
+    ("ICARE_SEQ",         icare_seq_C1,  icare_seq_C2),
     ("ICARE_PREDEFINED",  icare_pred_C1, icare_pred_C2),
     ("CRIMSON",           crimson_C1,    crimson_C2),
     ("GREEN",             green_C1,      green_C2),
@@ -438,13 +458,14 @@ RATER_COLORS  = ["#0072B2", "#D55E00", "#009E73"]  # Wong colorblind-safe palett
 print("\nPer-rater alignment (bootstrap across cases):")
 forest_per_rater = []
 for label, C1, C2 in FOREST_METRICS:
+    rng = RNG_SEQ if label == "ICARE_SEQ" else RNG
     mp = metric_pref(C1, C2)
     per_rater_pcts = [alignment_pct(mp, rater_prefs[uid]) for uid in rater_ids]
     mean = np.mean(per_rater_pcts)
     # Bootstrap across cases (n=100) for stable CIs
     boot_means = []
     for _ in range(N_BOOT):
-        idx = RNG.choice(N, N, replace=True)
+        idx = rng.choice(N, N, replace=True)
         boot_per_rater = []
         for uid in rater_ids:
             rp = rater_prefs[uid][idx]
@@ -549,10 +570,11 @@ THRESHOLD  = 2
 N_DECISIVE = len(dec_idx)
 print(f"\nDecisive cases (≥2/3 majority): n={N_DECISIVE}")
 
-def consensus_alignment_ci(m_pref, n_boot=N_BOOT):
+def consensus_alignment_ci(m_pref, n_boot=N_BOOT, rng=None):
+    rng   = RNG if rng is None else rng
     hits  = (m_pref[dec_idx] == dec_cons).astype(float)
     pct   = hits.mean() * 100
-    boots = [RNG.choice(hits, len(hits), replace=True).mean() * 100
+    boots = [rng.choice(hits, len(hits), replace=True).mean() * 100
              for _ in range(n_boot)]
     lo, hi = np.percentile(boots, [2.5, 97.5])
     return pct, lo, hi
@@ -561,7 +583,7 @@ print(f"\nDecisive-consensus alignment (≥{THRESHOLD}/3, n={N_DECISIVE}):")
 forest_data = []
 for label, C1, C2 in FOREST_METRICS:
     mp = metric_pref(C1, C2)
-    pct, lo, hi = consensus_alignment_ci(mp)
+    pct, lo, hi = consensus_alignment_ci(mp, rng=(RNG_SEQ if label == "ICARE_SEQ" else None))
     forest_data.append(dict(label=label, pct=pct, lo=lo, hi=hi))
     print(f"  {label:22s}: {pct:.1f}%  [{lo:.1f}, {hi:.1f}]")
 
