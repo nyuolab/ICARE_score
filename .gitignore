@@ -1,5 +1,6 @@
 # Environment variables (contains secrets and local paths)
 .env
+config/envs/*.env
 
 # Python
 __pycache__/

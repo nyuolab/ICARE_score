@@ -25,12 +25,28 @@ if [ ! -f "src/mcq_generation.py" ]; then
     exit 1
 fi
 
-# Load environment variables from .env file
+# Load environment variables from env file (default: .env)
+# Load shared base settings from .env
 if [ -f ".env" ]; then
-    echo "Loading environment variables from .env file..."
-    export $(cat .env | grep -v '^#' | xargs)
+    echo "Loading base environment from .env ..."
+    set -a
+    # shellcheck disable=SC1091
+    source ".env"
+    set +a
 else
     echo "Warning: .env file not found. Falling back to explicit defaults."
+fi
+
+# Load model-specific overrides (optional)
+ENV_FILE="${ENV_FILE:-}"
+if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
+    echo "Loading model overrides from $ENV_FILE ..."
+    set -a
+    # shellcheck disable=SC1090
+    source "$ENV_FILE"
+    set +a
+elif [ -n "$ENV_FILE" ]; then
+    echo "Warning: ENV_FILE set to $ENV_FILE but file not found."
 fi
 
 # Load conda (save/restore cwd in case ~/.bashrc changes it)

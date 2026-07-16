@@ -43,12 +43,15 @@ def make_llama_request(
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-    else:
+    elif Config.API_AUTH_HEADER_TYPE in ("api-key", "apikey"):
+        header_name = "api-key" if Config.API_AUTH_HEADER_TYPE == "api-key" else "apiKey"
         headers = {
-            "apiKey": api_key,
+            header_name: api_key,
             "accept": "application/json",
             "Content-Type": "application/json"
         }
+    else:
+        raise ValueError(f"Unsupported API_AUTH_HEADER_TYPE: {Config.API_AUTH_HEADER_TYPE}")
     
     data = {
         "model": model,
