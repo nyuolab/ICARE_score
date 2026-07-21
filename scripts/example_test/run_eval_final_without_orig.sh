@@ -47,6 +47,7 @@ EVAL_SEED="${EVAL_SEED:-123}"
 NUM_QUESTIONS="${NUM_QUESTIONS:-40}" # e.g. NUM_QUESTIONS=5 for a smaller test run
 INPUT_CSV="${INPUT_CSV:-test_data/sample_iuxray_reports.csv}"
 OUTPUT_DIR="${OUTPUT_DIR:-test_data/output}"
+NUM_SAMPLES=$(( $(wc -l < "${INPUT_CSV}") - 1 ))
 
 export PYTHONHASHSEED=$EVAL_SEED
 
@@ -55,6 +56,7 @@ echo "  ICARE Score - End-to-End Test Run"
 echo "============================================="
 echo "Input CSV:      ${INPUT_CSV}"
 echo "Output Dir:     ${OUTPUT_DIR}"
+echo "Num Samples:    ${NUM_SAMPLES}"
 echo "Eval Seed:      ${EVAL_SEED}"
 echo "Num Questions:  ${NUM_QUESTIONS}"
 echo "============================================="
@@ -131,6 +133,7 @@ TIMING_FILE="${OUTPUT_DIR}/pipeline_timing.json"
 cat > "${TIMING_FILE}" <<EOF
 {
   "eval_seed": ${EVAL_SEED},
+  "num_samples": ${NUM_SAMPLES},
   "num_questions_per_report": ${NUM_QUESTIONS},
   "step1_sec": ${STEP1_SEC},
   "step2_sec": ${STEP2_SEC},
