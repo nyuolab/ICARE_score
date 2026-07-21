@@ -63,20 +63,27 @@ INPUT: test_data/sample_iuxray_reports.csv
     │   Reads: filtered_questions_shuffled.csv + original CSV (both report columns)
     │   Produces: mcqa_eval/mcq_eval_dataset_level_agreement_stats.csv, report_level_stats, etc.
     │
-    └── Step 4 (optional): Question Categorization
+    ├── Step 4: Compile Results (src/compile_results.py)  [run_eval_final_without_orig.sh only]
+    │   Reads: Step 1–3 outputs under shuffled_ans_choices_data/
+    │   Produces: icare_results.json, icare_results_summary.csv, pipeline_timing.json
+    │
+    └── Step 5 (optional): Question Categorization
         Reads: filtered_questions_shuffled.csv + mcqa_eval_answer_predictions.csv from Step 2 & 3
         Produces: question_categorization/combined_mcqa_data.csv, clustered_questions_with_names.csv,
                   cluster_names.json, analysis/all_models_gt_vs_gen_agreement.png
 ```
 
-**Scripts:** `run_eval.sh` → Steps 1–3 | `run_question_categorization.sh` → Step 4
+**Default script:** `run_eval_final_without_orig.sh` → Steps 1–4 on `shuffled_ans_choices_data`
+
+**Ablation script:** `run_eval.sh` → Steps 1–3 on **both** `orig_data` and `shuffled_ans_choices_data` (useful for comparing unshuffled vs shuffled answer choices)
 
 ## Scripts
 
 | Script | Description |
 |--------|-------------|
-| `run_eval.sh` | Runs steps 1–3 (MCQ gen → filtering → MCQA eval) on the sample data |
-| `run_question_categorization.sh` | Runs step 4 on the eval output. Run `run_eval.sh` first. |
+| `run_eval_final_without_orig.sh` | End-to-end pipeline (Steps 1–4): same as `run_eval.sh` but Steps 2–3 on `shuffled_ans_choices_data` only; writes `icare_results.json`, `icare_results_summary.csv`, `pipeline_timing.json` |
+| `run_eval.sh` | Steps 1–3 on **both** `orig_data` and `shuffled_ans_choices_data` (includes orig_data ablation steps) |
+| `run_question_categorization.sh` | Optional question categorization. Run an eval script first. |
 
 ## Usage
 
@@ -85,18 +92,29 @@ INPUT: test_data/sample_iuxray_reports.csv
 - **Local LLM (no API key):** Follow the "Local LLM Setup" section in the root README, then `cp .env.local_example .env`.
 - **Private/hosted API:** `cp .env.example .env` and fill in `RRGEVAL_API_KEY`, `RRGEVAL_API_URL`.
 
-### 2. Run the eval
+### 2. Run the end-to-end pipeline
 
 From the repo root:
 
 ```bash
-bash scripts/example_test/run_eval.sh
-# or: sbatch scripts/example_test/run_eval.sh  (SLURM)
+bash scripts/example_test/run_eval_final_without_orig.sh
+# or: sbatch scripts/example_test/run_eval_final_without_orig.sh  (SLURM)
 ```
 
-Results in `test_data/output/`. Uses 5 MCQs per report (instead of 40) for a fast run.
+Results in `test_data/output/`:
+- `icare_results.json` — per-sample detail + step timing
+- `icare_results_summary.csv` — one row per sample (agreement %, question counts)
+- `pipeline_timing.json` — step1/2/3 durations (seconds)
+
+To also run filtering and evaluation on `orig_data` (answer-order ablation):
+
+```bash
+bash scripts/example_test/run_eval.sh
+```
 
 ### 3. (Optional) Question categorization
+
+Run after Steps 1–3 (either eval script):
 
 ```bash
 bash scripts/example_test/run_question_categorization.sh

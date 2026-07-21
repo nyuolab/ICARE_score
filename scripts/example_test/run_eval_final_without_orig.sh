@@ -7,13 +7,16 @@
 #SBATCH --output=logs/icare_test_%j.log
 
 # =============================================================================
-# End-to-end test of the ICARE evaluation pipeline using sample test data.
-# Runs Steps 1–3 on both orig_data and shuffled_ans_choices_data (ablation path).
+# End-to-end ICARE evaluation pipeline on sample test data.
+#
+# Same as run_eval.sh except:
+#   - Steps 2-3 run on shuffled_ans_choices_data only (see run_eval.sh for orig_data ablation)
+#   - Step 4 compiles icare_results.json + icare_results_summary.csv (+ step timing)
 #
 # Usage:
 #   cd ICARE_score
-#   sbatch scripts/example_test/run_eval.sh
-#   # Or: bash scripts/example_test/run_eval.sh
+#   sbatch scripts/example_test/run_eval_final_without_orig.sh
+#   # Or: bash scripts/example_test/run_eval_final_without_orig.sh
 # =============================================================================
 
 set -e  # Exit on any error
@@ -40,10 +43,10 @@ conda activate rrg-eval-clean
 # =============================================================================
 # Configuration
 # =============================================================================
-EVAL_SEED=123
-NUM_QUESTIONS=40 # reduce to 5 for a smaller test run
-INPUT_CSV="test_data/sample_iuxray_reports.csv"
-OUTPUT_DIR="test_data/output"
+EVAL_SEED="${EVAL_SEED:-123}"
+NUM_QUESTIONS="${NUM_QUESTIONS:-40}" # e.g. NUM_QUESTIONS=5 for a smaller test run
+INPUT_CSV="${INPUT_CSV:-test_data/sample_iuxray_reports.csv}"
+OUTPUT_DIR="${OUTPUT_DIR:-test_data/output}"
 
 export PYTHONHASHSEED=$EVAL_SEED
 
@@ -64,11 +67,14 @@ if [ -d "${OUTPUT_DIR}" ]; then
 fi
 mkdir -p "${OUTPUT_DIR}"
 
+PIPELINE_START=$(date +%s)
+
 # =============================================================================
 # Step 1: Generate MCQs for both GT and Gen reports
 # =============================================================================
 echo ""
 echo ">>> Step 1: Generating MCQs..."
+STEP1_START=$(date +%s)
 for ref in "gt" "gen"; do
     echo "  Generating MCQs for ${ref} reports..."
     python src/mcq_generation.py \
@@ -78,14 +84,17 @@ for ref in "gt" "gen"; do
         --num_questions ${NUM_QUESTIONS} \
         --seed ${EVAL_SEED}
 done
-echo ">>> Step 1 complete."
+STEP1_SEC=$(( $(date +%s) - STEP1_START ))
+echo ">>> Step 1 complete (${STEP1_SEC}s)."
 
 # =============================================================================
 # Step 2: Filter and Shuffle MCQs
 # =============================================================================
 echo ""
 echo ">>> Step 2: Filtering and shuffling MCQs..."
-for data_type in "orig_data" "shuffled_ans_choices_data"; do
+STEP2_START=$(date +%s)
+# for data_type in "orig_data" "shuffled_ans_choices_data"; do
+for data_type in "shuffled_ans_choices_data"; do
     for ref in "gt" "gen"; do
         INPUT_DIR_MCQ="${OUTPUT_DIR}/${data_type}/${ref}_reports_as_ref"
         echo "  Filtering ${data_type}/${ref}_reports_as_ref..."
@@ -95,14 +104,17 @@ for data_type in "orig_data" "shuffled_ans_choices_data"; do
             --seed ${EVAL_SEED}
     done
 done
-echo ">>> Step 2 complete."
+STEP2_SEC=$(( $(date +%s) - STEP2_START ))
+echo ">>> Step 2 complete (${STEP2_SEC}s)."
 
 # =============================================================================
 # Step 3: MCQA Evaluation
 # =============================================================================
 echo ""
 echo ">>> Step 3: Running MCQA evaluation..."
-for data_type in "orig_data" "shuffled_ans_choices_data"; do
+STEP3_START=$(date +%s)
+# for data_type in "orig_data" "shuffled_ans_choices_data"; do
+for data_type in "shuffled_ans_choices_data"; do
     echo "  Evaluating ${data_type}..."
     python src/mcqa_evaluation.py \
         --base_dir "${OUTPUT_DIR}" \
@@ -111,7 +123,34 @@ for data_type in "orig_data" "shuffled_ans_choices_data"; do
         --gen_report_csv_file "${INPUT_CSV}" \
         --gt_report_csv_file "${INPUT_CSV}"
 done
-echo ">>> Step 3 complete."
+STEP3_SEC=$(( $(date +%s) - STEP3_START ))
+echo ">>> Step 3 complete (${STEP3_SEC}s)."
+
+TOTAL_SEC=$(( $(date +%s) - PIPELINE_START ))
+TIMING_FILE="${OUTPUT_DIR}/pipeline_timing.json"
+cat > "${TIMING_FILE}" <<EOF
+{
+  "eval_seed": ${EVAL_SEED},
+  "num_questions_per_report": ${NUM_QUESTIONS},
+  "step1_sec": ${STEP1_SEC},
+  "step2_sec": ${STEP2_SEC},
+  "step3_sec": ${STEP3_SEC},
+  "total_sec": ${TOTAL_SEC}
+}
+EOF
+
+# =============================================================================
+# Step 4: Compile per-sample results
+# =============================================================================
+echo ""
+echo ">>> Step 4: Compiling per-sample results..."
+python src/compile_results.py \
+    --base_dir    "${OUTPUT_DIR}" \
+    --input_csv   "${INPUT_CSV}" \
+    --output      "${OUTPUT_DIR}/icare_results.json" \
+    --summary_csv "${OUTPUT_DIR}/icare_results_summary.csv" \
+    --timing_file "${TIMING_FILE}"
+echo ">>> Step 4 complete."
 
 # =============================================================================
 # Summary
@@ -129,6 +168,9 @@ else
 fi
 echo ""
 echo "Key result files:"
+echo "  - ${OUTPUT_DIR}/icare_results.json"
+echo "  - ${OUTPUT_DIR}/icare_results_summary.csv"
+echo "  - ${OUTPUT_DIR}/pipeline_timing.json"
 echo "  - ${OUTPUT_DIR}/shuffled_ans_choices_data/gt_reports_as_ref/mcqa_eval/mcq_eval_dataset_level_agreement_stats.csv"
 echo "  - ${OUTPUT_DIR}/shuffled_ans_choices_data/gen_reports_as_ref/mcqa_eval/mcq_eval_dataset_level_agreement_stats.csv"
 echo "  - ${OUTPUT_DIR}/shuffled_ans_choices_data/gt_reports_as_ref/mcqa_eval/mcq_eval_report_level_stats.csv"
