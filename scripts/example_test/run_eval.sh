@@ -8,7 +8,7 @@
 
 # =============================================================================
 # End-to-end test of the ICARE evaluation pipeline using sample test data.
-# Uses 10 reports with 5 MCQs each for a quick validation run.
+# Runs Steps 1–3 on both orig_data and shuffled_ans_choices_data (ablation path).
 #
 # Usage:
 #   cd ICARE_score
@@ -41,7 +41,7 @@ conda activate rrg-eval-clean
 # Configuration
 # =============================================================================
 EVAL_SEED=123
-NUM_QUESTIONS=40 # Use 5 instead of 40 for faster testing
+NUM_QUESTIONS=40 # reduce to 5 for a smaller test run
 INPUT_CSV="test_data/sample_iuxray_reports.csv"
 OUTPUT_DIR="test_data/output"
 

@@ -1,30 +1,43 @@
 """
-Compile per-sample results from the ICARE pipeline into a single JSON.
+Compile per-sample results from the ICARE pipeline into a single JSON and summary CSV.
 
-For each sample (report), the output contains:
+Reads outputs under shuffled_ans_choices_data/ (same layout as run_eval_final_without_orig.sh).
+
+For each sample (report), the JSON contains:
   - gt_report / gen_report text
-  - All GT-reference questions and Gen-reference questions (pre-filtering)
+  - All GT-reference and Gen-reference questions (pre-filtering)
   - Filtered GT and Gen questions (report-dependent only), with counts
   - Eval predictions for each filtered question
   - Agreeing / disagreeing question lists (GT ref and Gen ref separately)
-  - Agreement scores: omission (GT-ref) and hallucination (Gen-ref)
+  - Disagreement scores: omission (GT-ref) and hallucination (Gen-ref)
+
+The summary CSV contains one row per sample:
+  sample_id, study_id, gt_agreement_pct, gen_agreement_pct,
+  total_gt_questions, total_gen_questions
 
 Usage:
-    python src/compile_results.py \
-        --base_dir  <pipeline output dir>  \
-        --input_csv <original reports CSV> \
-        --output    <path to write JSON>
+    python src/compile_results.py \\
+        --base_dir  <pipeline output dir>  \\
+        --input_csv <original reports CSV> \\
+        --output    <path to write JSON> \\
+        --summary_csv <path to write summary CSV> \\
+        --timing_file <optional pipeline_timing.json>
 
-    # Example (matches run_eval_final_without_orig.sh layout):
-    python src/compile_results.py \
-        --base_dir  test_data/output \
-        --input_csv test_data/sample_iuxray_reports.csv \
-        --output    test_data/output/icare_results.json
+    # Example:
+    python src/compile_results.py \\
+        --base_dir  test_data/output \\
+        --input_csv test_data/sample_iuxray_reports.csv \\
+        --output    test_data/output/icare_results.json \\
+        --summary_csv test_data/output/icare_results_summary.csv \\
+        --timing_file test_data/output/pipeline_timing.json
 """
 
 import argparse
 import ast
 import json
+from pathlib import Path
+from typing import Dict, List, Optional
+
 import pandas as pd
 
 
@@ -32,7 +45,7 @@ import pandas as pd
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _load_mcqa_json(path: str) -> list[dict]:
+def _load_mcqa_json(path: str) -> List[dict]:
     with open(path) as f:
         return json.load(f)["mcq_data"]
 
@@ -56,7 +69,7 @@ def _load_eval_predictions(path: str) -> pd.DataFrame:
     return df
 
 
-def _question_row_to_dict(row: pd.Series, extra_keys: list[str] = None) -> dict:
+def _question_row_to_dict(row: pd.Series, extra_keys: Optional[List[str]] = None) -> dict:
     base = {
         "question_id":   int(row["Question_ID"]),
         "question_text": row["Question_Text"],
@@ -78,8 +91,8 @@ def build_sample_entry(
     sample_idx: int,
     gt_report: str,
     gen_report: str,
-    gt_all_questions: list[dict],
-    gen_all_questions: list[dict],
+    gt_all_questions: List[dict],
+    gen_all_questions: List[dict],
     gt_filtered_df: pd.DataFrame,
     gen_filtered_df: pd.DataFrame,
     gt_eval_df: pd.DataFrame,
@@ -174,6 +187,8 @@ def main():
     parser.add_argument("--base_dir",  required=True, help="Pipeline output base directory")
     parser.add_argument("--input_csv", required=True, help="Original reports CSV (id, gt_report, gen_report)")
     parser.add_argument("--output",    required=True, help="Path for the output JSON file")
+    parser.add_argument("--summary_csv", default="", help="Optional path for per-sample summary CSV")
+    parser.add_argument("--timing_file", default="", help="Optional JSON file with pipeline step durations (seconds)")
     args = parser.parse_args()
 
     data_type = "shuffled_ans_choices_data"
@@ -185,8 +200,8 @@ def main():
     gt_mcqa  = _load_mcqa_json(f"{base}/gt_reports_as_ref/mcqa_data.json")
     gen_mcqa = _load_mcqa_json(f"{base}/gen_reports_as_ref/mcqa_data.json")
 
-    gt_filtered  = _load_filtered(f"{base}/gt_reports_as_ref/mcqa_filtering/filtered_questions.csv")
-    gen_filtered = _load_filtered(f"{base}/gen_reports_as_ref/mcqa_filtering/filtered_questions.csv")
+    gt_filtered  = _load_filtered(f"{base}/gt_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv")
+    gen_filtered = _load_filtered(f"{base}/gen_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv")
 
     gt_eval  = _load_eval_predictions(f"{base}/gt_reports_as_ref/mcqa_eval/mcqa_eval_answer_predictions.csv")
     gen_eval = _load_eval_predictions(f"{base}/gen_reports_as_ref/mcqa_eval/mcqa_eval_answer_predictions.csv")
@@ -212,12 +227,39 @@ def main():
         )
         samples.append(entry)
 
+    timing = None
+    if args.timing_file:
+        with open(args.timing_file) as f:
+            timing = json.load(f)
+
     output = {"samples": samples}
+    if timing is not None:
+        output = {"timing": timing, **output}
 
     with open(args.output, "w") as f:
         json.dump(output, f, indent=2)
 
     print(f"Wrote {len(samples)} samples to {args.output}")
+
+    summary_rows = []
+    for i, row in reports_df.iterrows():
+        s = samples[i]
+        gt_total = s["gt_reference"]["agreeing_count"] + s["gt_reference"]["disagreeing_count"]
+        gen_total = s["gen_reference"]["agreeing_count"] + s["gen_reference"]["disagreeing_count"]
+        gt_agree_pct = round(s["gt_reference"]["agreeing_count"] / gt_total * 100, 4) if gt_total else None
+        gen_agree_pct = round(s["gen_reference"]["agreeing_count"] / gen_total * 100, 4) if gen_total else None
+        summary_rows.append({
+            "sample_id": i,
+            "study_id": row["id"] if "id" in row else i,
+            "gt_agreement_pct": gt_agree_pct,
+            "gen_agreement_pct": gen_agree_pct,
+            "total_gt_questions": gt_total,
+            "total_gen_questions": gen_total,
+        })
+
+    summary_csv = args.summary_csv or str(Path(args.output).with_name("icare_results_summary.csv"))
+    pd.DataFrame(summary_rows).to_csv(summary_csv, index=False)
+    print(f"Wrote summary CSV to {summary_csv}")
     # Quick sanity print
     for s in samples:
         print(
