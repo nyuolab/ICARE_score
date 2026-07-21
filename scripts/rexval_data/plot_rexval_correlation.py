@@ -35,6 +35,7 @@ from scipy import stats
 # ---------------------------------------------------------------------------
 BASE      = Path("/gpfs/data/oermannlab/users/rd3571")
 EVAL_DIR  = BASE / "ICARE_score/outputs/rexval/rexval_test_200/eval_seed_123/shuffled_ans_choices_data"
+ALLQUES_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200_allques/eval_seed_123/shuffled_ans_choices_data"
 SEQ_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200/eval_seed_123_sequential_b10/shuffled_ans_choices_data"
 OPUS_EVAL_DIR   = BASE / "ICARE_score/outputs/rexval/rexval_test_200_opus46/eval_seed_123/shuffled_ans_choices_data"
 SONNET_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200_sonnet46/eval_seed_123/shuffled_ans_choices_data"
@@ -128,6 +129,7 @@ def _ap_avg(eval_dir):
 ap_opus   = _ap_avg(OPUS_EVAL_DIR)
 ap_sonnet = _ap_avg(SONNET_EVAL_DIR)
 ap_gpt54  = _ap_avg(GPT54_EVAL_DIR)
+ap_allques = _ap_avg(ALLQUES_EVAL_DIR)
 
 # ---------------------------------------------------------------------------
 # Load ICARE predefined
@@ -171,6 +173,7 @@ merged = rexval_df[["row_id", "study_number", "origin"]].copy()
 merged["ap_gt"]     = ap_gt
 merged["ap_gen"]    = ap_gen
 merged["ap_avg"]    = ap_avg
+merged["ap_allques"] = ap_allques
 merged["ap_seq"]    = ap_seq
 merged["ap_opus"]   = ap_opus
 merged["ap_sonnet"] = ap_sonnet
@@ -193,6 +196,7 @@ merged = merged.merge(error_scores, on=["study_number", "origin"], how="left")
 merged["dis_gt"]      = 1 - merged["ap_gt"]   / 100
 merged["dis_gen"]     = 1 - merged["ap_gen"]  / 100
 merged["dis_avg"]     = 1 - merged["ap_avg"]  / 100
+merged["dis_allques"] = 1 - merged["ap_allques"] / 100
 merged["dis_seq"]     = 1 - merged["ap_seq"]  / 100
 merged["dis_opus"]    = 1 - merged["ap_opus"] / 100
 merged["dis_sonnet"]  = 1 - merged["ap_sonnet"] / 100
@@ -288,6 +292,7 @@ CORR_METRICS = [
     ("AlignScore",       "neg_alignscore"),
     ("CRIMSON",          "neg_crimson"),
     ("ICARE_AVG",        "dis_avg"),
+    ("ICARE_ALLQUES",    "dis_allques"),
     ("ICARE_SEQ",        "dis_seq"),
     ("ICARE_OPUS46",     "dis_opus"),
     ("ICARE_SONNET46",   "dis_sonnet"),
@@ -365,6 +370,7 @@ def latex_fmt_highlight(val, lo, hi, rank):
 
 LATEX_LABELS = {
     "ICARE_AVG":        r"\textbf{ICARE}$_{\textbf{AVG}}$",
+    "ICARE_ALLQUES":    r"\textbf{ICARE}$_{\textbf{ALLQ}}$",
     "ICARE_SEQ":        r"\textbf{ICARE}$_{\textbf{SEQ}}$",
     "ICARE_OPUS46":     r"\textbf{ICARE}$_{\textbf{OPUS}}$",
     "ICARE_SONNET46":   r"\textbf{ICARE}$_{\textbf{SONNET}}$",
@@ -557,6 +563,7 @@ def get_metric_top1(df_merged, col, ascending):
 # (label, score_col, ascending) — ascending=True means lower score = better
 FOREST_METRICS = [
     ("ICARE_AVG ◄",       "ap_avg",    False),
+    ("ICARE_ALLQUES",     "ap_allques", False),
     ("ICARE_SEQ",         "ap_seq",    False),
     ("ICARE_OPUS46",      "ap_opus",   False),
     ("ICARE_SONNET46",    "ap_sonnet", False),
