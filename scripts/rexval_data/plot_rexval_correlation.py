@@ -291,19 +291,19 @@ CORR_METRICS = [
     ("GREEN",            "neg_green"),
     ("AlignScore",       "neg_alignscore"),
     ("CRIMSON",          "neg_crimson"),
-    ("ICARE_AVG",        "dis_avg"),
-    ("ICARE_ALLQUES",    "dis_allques"),
-    ("ICARE_SEQ",        "dis_seq"),
-    ("ICARE_OPUS46",     "dis_opus"),
-    ("ICARE_SONNET46",   "dis_sonnet"),
-    ("ICARE_GPT54",      "dis_gpt54"),
-    ("ICARE_PREDEFINED", "dis_pred"),
+    ("ICARE Opus",       "dis_opus"),
+    ("ICARE Sonnet",     "dis_sonnet"),
+    ("ICARE GPT-5.4",    "dis_gpt54"),
+    ("ICARE Llama",      "dis_avg"),
+    ("ICARE Llama (all Q)", "dis_allques"),
+    ("ICARE Llama SEQ",  "dis_seq"),
+    ("ICARE Llama PRE",  "dis_pred"),
 ]
 
 print("Computing correlations (Kendall τ / Pearson r vs clinically significant errors)...")
 corr_results = {}
 for label, col in CORR_METRICS:
-    rng = RNG_SEQ if label == "ICARE_SEQ" else None
+    rng = RNG_SEQ if label == "ICARE Llama SEQ" else None
     corr_results[label] = compute_corr_by_cand(merged, col, rng=rng)
     avg_tau = np.mean([corr_results[label][c]["tau"] for c in CANDIDATES])
     avg_r   = np.mean([corr_results[label][c]["r"]   for c in CANDIDATES])
@@ -369,14 +369,14 @@ def latex_fmt_highlight(val, lo, hi, rank):
     return s
 
 LATEX_LABELS = {
-    "ICARE_AVG":        r"\textbf{ICARE}$_{\textbf{AVG}}$",
-    "ICARE_ALLQUES":    r"\textbf{ICARE}$_{\textbf{ALLQ}}$",
-    "ICARE_SEQ":        r"\textbf{ICARE}$_{\textbf{SEQ}}$",
-    "ICARE_OPUS46":     r"\textbf{ICARE}$_{\textbf{OPUS}}$",
-    "ICARE_SONNET46":   r"\textbf{ICARE}$_{\textbf{SONNET}}$",
-    "ICARE_GPT54":      r"\textbf{ICARE}$_{\textbf{GPT54}}$",
-    "ICARE_PREDEFINED": r"\textbf{ICARE}$_{\textbf{PRE}}$",
-    "CRIMSON":          r"CRIMSON*",
+    "ICARE Llama":           r"\textbf{ICARE}$_{\textbf{Llama}}$",
+    "ICARE Llama (all Q)":   r"\textbf{ICARE}$_{\textbf{Llama-ALLQ}}$",
+    "ICARE Llama SEQ":       r"\textbf{ICARE}$_{\textbf{Llama-SEQ}}$",
+    "ICARE Llama PRE":       r"\textbf{ICARE}$_{\textbf{Llama-PRE}}$",
+    "ICARE Opus":            r"\textbf{ICARE}$_{\textbf{Opus}}$",
+    "ICARE Sonnet":          r"\textbf{ICARE}$_{\textbf{Sonnet}}$",
+    "ICARE GPT-5.4":         r"\textbf{ICARE}$_{\textbf{GPT54}}$",
+    "CRIMSON":               r"CRIMSON*",
 }
 
 def build_tabular(cands, include_top_header):
@@ -562,14 +562,14 @@ def get_metric_top1(df_merged, col, ascending):
 
 # (label, score_col, ascending) — ascending=True means lower score = better
 FOREST_METRICS = [
-    ("ICARE_AVG ◄",       "ap_avg",    False),
-    ("ICARE_ALLQUES",     "ap_allques", False),
-    ("ICARE_SEQ",         "ap_seq",    False),
-    ("ICARE_OPUS46",      "ap_opus",   False),
-    ("ICARE_SONNET46",    "ap_sonnet", False),
-    ("ICARE_GPT54",       "ap_gpt54",  False),
-    ("ICARE_PREDEFINED",  "ap_pred",   False),
-    ("CRIMSON",           "crimson",    False),
+    ("ICARE Opus",            "ap_opus",    False),
+    ("ICARE Sonnet",          "ap_sonnet",  False),
+    ("ICARE GPT-5.4",         "ap_gpt54",   False),
+    ("ICARE Llama ◄",         "ap_avg",     False),
+    ("ICARE Llama (all Q)",   "ap_allques", False),
+    ("ICARE Llama SEQ",       "ap_seq",     False),
+    ("ICARE Llama PRE",       "ap_pred",    False),
+    ("CRIMSON",               "crimson",    False),
     ("GREEN",             "green",      False),
     ("AlignScore",        "alignscore", False),
     ("BERTScore",         "bertscore",  False),
@@ -591,7 +591,7 @@ rater_series_by_rater = {
 }
 forest_per_rater = []
 for label, col, asc in FOREST_METRICS:
-    rater_rng = RNG_SEQ if label == "ICARE_SEQ" else RNG
+    rater_rng = RNG_SEQ if label == "ICARE Llama SEQ" else RNG
     metric_top1 = get_metric_top1(merged, col, asc)
     per_rater_pcts = []
     for rater in RATERS:
@@ -637,7 +637,7 @@ jitter = np.linspace(-0.25, 0.25, len(RATERS))
 fig2, ax2 = plt.subplots(figsize=(13, 9))
 
 for row, y in zip(forest_per_rater, y_pos):
-    is_avg   = row["label"] == "ICARE_AVG ◄"
+    is_avg   = row["label"] == "ICARE Llama ◄"
     is_icare = row["label"].startswith("ICARE")
     color    = "#1565C0" if is_icare else "#555555"
     lw       = 2.0 if is_avg else 1.4
@@ -734,7 +734,7 @@ forest_consensus = []
 for label, col, asc in FOREST_METRICS:
     metric_top1 = get_metric_top1(merged, col, asc)
     pct, lo, hi = consensus_alignment_ci(
-        metric_top1, decisive_df, rng=(RNG_SEQ if label == "ICARE_SEQ" else None))
+        metric_top1, decisive_df, rng=(RNG_SEQ if label == "ICARE Llama SEQ" else None))
     forest_consensus.append(dict(label=label, pct=pct, lo=lo, hi=hi))
     print(f"  {label:22s}: {pct:.1f}%  [{lo:.1f}, {hi:.1f}]")
 
@@ -753,7 +753,7 @@ n_fd  = len(forest_consensus)
 y_pos = np.arange(n_fd)[::-1]
 
 for row, y in zip(forest_consensus, y_pos):
-    is_avg   = row["label"] == "ICARE_AVG ◄"
+    is_avg   = row["label"] == "ICARE Llama ◄"
     is_icare = row["label"].startswith("ICARE")
     color    = "#1565C0" if is_icare else "#555555"
     lw       = 2.0 if is_avg else 1.4
