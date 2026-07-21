@@ -11,9 +11,16 @@ All metrics loaded from produced output files.
 Usage:
     cd ICARE_score
     python scripts/rexval_data/plot_rexval_correlation.py
+
+    # Optional: drop low post-filter question reports from ALL ICARE methods (fair comparison)
+    MIN_FILTERED_QUESTIONS=10 python scripts/rexval_data/plot_rexval_correlation.py
+
+    # See post-filter question distributions first:
+    python scripts/rexval_data/analyze_rexval_question_counts.py
 """
 
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +36,9 @@ from scipy import stats
 BASE      = Path("/gpfs/data/oermannlab/users/rd3571")
 EVAL_DIR  = BASE / "ICARE_score/outputs/rexval/rexval_test_200/eval_seed_123/shuffled_ans_choices_data"
 SEQ_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200/eval_seed_123_sequential_b10/shuffled_ans_choices_data"
+OPUS_EVAL_DIR   = BASE / "ICARE_score/outputs/rexval/rexval_test_200_opus46/eval_seed_123/shuffled_ans_choices_data"
+SONNET_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200_sonnet46/eval_seed_123/shuffled_ans_choices_data"
+GPT54_EVAL_DIR  = BASE / "ICARE_score/outputs/rexval/rexval_test_200_gpt54/eval_seed_123/shuffled_ans_choices_data"
 PRED_DIR  = BASE / "ICARE_score/outputs/rexval/predefined/eval_seed_123/mcqa_eval"
 BASELINES = BASE / "ICARE_score/outputs/rexval/rexval_test_200/baselines"
 REXVAL_CSV = BASE / "cxr_report_datasets/rexval/RexVal_test_icare_200.csv"
@@ -98,6 +108,28 @@ ap_gen_seq = gen_stats_seq.loc[range(200), "Agreement_Percentage"].values
 ap_seq     = (ap_gt_seq + ap_gen_seq) / 2
 
 # ---------------------------------------------------------------------------
+# Load ICARE model-ablation runs (Opus / Sonnet / GPT-5.4)
+# ---------------------------------------------------------------------------
+def _ap_avg(eval_dir):
+    """Mean GT/GEN agreement for Report_IDs 0..199; NaN if either side missing."""
+    gt  = pd.read_csv(eval_dir / "gt_reports_as_ref/mcqa_eval/mcq_eval_report_level_stats.csv").set_index("Report_ID")
+    gen = pd.read_csv(eval_dir / "gen_reports_as_ref/mcqa_eval/mcq_eval_report_level_stats.csv").set_index("Report_ID")
+    ids = range(200)
+    avg = (
+        gt.reindex(ids)["Agreement_Percentage"]
+        + gen.reindex(ids)["Agreement_Percentage"]
+    ) / 2
+    n_miss = int(avg.isna().sum())
+    if n_miss:
+        miss = avg[avg.isna()].index.tolist()
+        print(f"WARNING: {eval_dir} incomplete — {n_miss}/200 rows NaN (missing Report_IDs: {miss})")
+    return avg.values
+
+ap_opus   = _ap_avg(OPUS_EVAL_DIR)
+ap_sonnet = _ap_avg(SONNET_EVAL_DIR)
+ap_gpt54  = _ap_avg(GPT54_EVAL_DIR)
+
+# ---------------------------------------------------------------------------
 # Load ICARE predefined
 # ---------------------------------------------------------------------------
 pred_stats = pd.read_csv(PRED_DIR / "mcq_eval_report_level_stats.csv").set_index("Report_ID")
@@ -140,6 +172,9 @@ merged["ap_gt"]     = ap_gt
 merged["ap_gen"]    = ap_gen
 merged["ap_avg"]    = ap_avg
 merged["ap_seq"]    = ap_seq
+merged["ap_opus"]   = ap_opus
+merged["ap_sonnet"] = ap_sonnet
+merged["ap_gpt54"]  = ap_gpt54
 merged["ap_pred"]   = ap_pred
 merged["crimson"]    = crimson_scores
 merged["green"]      = green_scores
@@ -159,6 +194,9 @@ merged["dis_gt"]      = 1 - merged["ap_gt"]   / 100
 merged["dis_gen"]     = 1 - merged["ap_gen"]  / 100
 merged["dis_avg"]     = 1 - merged["ap_avg"]  / 100
 merged["dis_seq"]     = 1 - merged["ap_seq"]  / 100
+merged["dis_opus"]    = 1 - merged["ap_opus"] / 100
+merged["dis_sonnet"]  = 1 - merged["ap_sonnet"] / 100
+merged["dis_gpt54"]   = 1 - merged["ap_gpt54"] / 100
 merged["dis_pred"]    = 1 - merged["ap_pred"] / 100
 merged["neg_crimson"]    = -merged["crimson"]
 merged["neg_green"]      = -merged["green"]
@@ -168,6 +206,40 @@ merged["neg_bert"]    = -merged["bertscore"]
 merged["neg_semb"]    = -merged["semb"]
 merged["neg_rg"]      = -merged["radgraph"]
 # merged["radcliq"]  — already higher=worse, use raw
+
+# ---------------------------------------------------------------------------
+# Optional shared filter: same Report_IDs for llama / opus / sonnet / gpt54
+# Uses post-filter counts from filtered_questions_shuffled.csv (see analyze script).
+# ---------------------------------------------------------------------------
+MIN_FILTERED_QUESTIONS = int(os.environ.get("MIN_FILTERED_QUESTIONS", "0"))
+
+
+def _post_filter_min_q(eval_dir):
+    def _one(ref):
+        p = eval_dir / f"{ref}_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv"
+        if not p.exists():
+            return pd.Series(index=range(200), dtype=float)
+        return pd.read_csv(p).groupby("Report_ID").size().reindex(range(200))
+    return np.minimum(_one("gt"), _one("gen"))
+
+
+if MIN_FILTERED_QUESTIONS > 0:
+    _icare_dirs = {
+        "llama": EVAL_DIR,
+        "opus46": OPUS_EVAL_DIR,
+        "sonnet46": SONNET_EVAL_DIR,
+        "gpt54": GPT54_EVAL_DIR,
+    }
+    _keep_ids = set(range(200))
+    for _name, _edir in _icare_dirs.items():
+        _mq = _post_filter_min_q(_edir)
+        _keep_ids &= set(_mq[_mq >= MIN_FILTERED_QUESTIONS].dropna().index.astype(int))
+    _n_before = len(merged)
+    merged = merged[merged["row_id"].isin(_keep_ids)].copy()
+    print(
+        f"MIN_FILTERED_QUESTIONS={MIN_FILTERED_QUESTIONS}: "
+        f"kept {len(_keep_ids)}/200 reports, {len(merged)}/{_n_before} rows"
+    )
 
 # ---------------------------------------------------------------------------
 # Correlation helpers
@@ -187,8 +259,15 @@ def compute_corr_by_cand(df, score_col, rng=None):
     results = {}
     for cand in CANDIDATES:
         sub = df[df["origin"] == cand].copy()
-        x = sub[score_col].values
-        y = sub["mean_clin_sig_errors"].values
+        x = sub[score_col].values.astype(float)
+        y = sub["mean_clin_sig_errors"].values.astype(float)
+        mask = np.isfinite(x) & np.isfinite(y)
+        x, y = x[mask], y[mask]
+        if len(x) < 5:
+            results[cand] = dict(tau=np.nan, r=np.nan,
+                                 tau_lo=np.nan, tau_hi=np.nan,
+                                 r_lo=np.nan, r_hi=np.nan)
+            continue
         tau = stats.kendalltau(x, y)[0]
         r   = stats.pearsonr(x, y)[0]
         tau_lo, tau_hi = bootstrap_ci(x, y, lambda a, b: stats.kendalltau(a, b)[0], rng=rng)
@@ -210,6 +289,9 @@ CORR_METRICS = [
     ("CRIMSON",          "neg_crimson"),
     ("ICARE_AVG",        "dis_avg"),
     ("ICARE_SEQ",        "dis_seq"),
+    ("ICARE_OPUS46",     "dis_opus"),
+    ("ICARE_SONNET46",   "dis_sonnet"),
+    ("ICARE_GPT54",      "dis_gpt54"),
     ("ICARE_PREDEFINED", "dis_pred"),
 ]
 
@@ -284,6 +366,9 @@ def latex_fmt_highlight(val, lo, hi, rank):
 LATEX_LABELS = {
     "ICARE_AVG":        r"\textbf{ICARE}$_{\textbf{AVG}}$",
     "ICARE_SEQ":        r"\textbf{ICARE}$_{\textbf{SEQ}}$",
+    "ICARE_OPUS46":     r"\textbf{ICARE}$_{\textbf{OPUS}}$",
+    "ICARE_SONNET46":   r"\textbf{ICARE}$_{\textbf{SONNET}}$",
+    "ICARE_GPT54":      r"\textbf{ICARE}$_{\textbf{GPT54}}$",
     "ICARE_PREDEFINED": r"\textbf{ICARE}$_{\textbf{PRE}}$",
     "CRIMSON":          r"CRIMSON*",
 }
@@ -473,6 +558,9 @@ def get_metric_top1(df_merged, col, ascending):
 FOREST_METRICS = [
     ("ICARE_AVG ◄",       "ap_avg",    False),
     ("ICARE_SEQ",         "ap_seq",    False),
+    ("ICARE_OPUS46",      "ap_opus",   False),
+    ("ICARE_SONNET46",    "ap_sonnet", False),
+    ("ICARE_GPT54",       "ap_gpt54",  False),
     ("ICARE_PREDEFINED",  "ap_pred",   False),
     ("CRIMSON",           "crimson",    False),
     ("GREEN",             "green",      False),

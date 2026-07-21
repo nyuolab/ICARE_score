@@ -323,6 +323,10 @@ def main():
                       help='Perturbation type (default: char)')
     parser.add_argument('--predefined_ques_csv', type=str, default='',
                       help='Path to predefined questions CSV; skips gt/gen question-source loop and runs evaluation once')
+    parser.add_argument('--question_set', type=str, default='filtered',
+                      choices=['filtered', 'all'],
+                      help='filtered: mcqa_filtering/filtered_questions_shuffled.csv (default); '
+                           'all: mcqa_eval_input/all_questions.csv (no report-dependent filtering)')
 
     args = parser.parse_args()
 
@@ -390,8 +394,14 @@ def main():
         os.makedirs(output_dir, exist_ok=True)
 
         # Input files
-        ques_csv_file = os.path.join(base_directory, data_type,
-                                   f'{ques_reference}_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv')
+        if args.question_set == 'all':
+            ques_csv_file = os.path.join(
+                base_directory, data_type,
+                f'{ques_reference}_reports_as_ref/mcqa_eval_input/all_questions.csv')
+        else:
+            ques_csv_file = os.path.join(
+                base_directory, data_type,
+                f'{ques_reference}_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv')
 
         # Output file
         mcqa_eval_ans_predictions_output_csv_file = os.path.join(output_dir, f"mcqa_eval_answer_predictions.csv")

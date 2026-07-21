@@ -27,10 +27,11 @@ def make_llama_request(
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-    elif Config.API_AUTH_HEADER_TYPE in ("api-key", "apikey"):
-        header_name = "api-key" if Config.API_AUTH_HEADER_TYPE == "api-key" else "apiKey"
+    elif Config.API_AUTH_HEADER_TYPE in ("api-key", "apikey", "bearer+api-key"):
+        # NYU Kong: api-key alone may fail; Bearer + api-key works
         headers = {
-            header_name: api_key,
+            "Authorization": f"Bearer {api_key}",
+            "api-key": api_key,
             "accept": "application/json",
             "Content-Type": "application/json"
         }

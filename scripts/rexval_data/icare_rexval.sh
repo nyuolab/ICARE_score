@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=icare_rexval
-#SBATCH --partition=gpu4_medium 
+#SBATCH --partition=oermannlab
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=128G
-#SBATCH --time=40:00:00
+#SBATCH --time=01:00:00
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=rd3571@nyu.edu
 
@@ -119,7 +119,8 @@ echo ">>> Step 1 complete."
 # -----------------------------------------------------------------------------
 echo ""
 echo ">>> Step 2: Filtering and shuffling MCQs..."
-for data_type in "orig_data" "shuffled_ans_choices_data"; do
+# for data_type in "orig_data" "shuffled_ans_choices_data"; do
+for data_type in "shuffled_ans_choices_data"; do
     for ref in "gt" "gen"; do
         INPUT_DIR_MCQ="${OUTPUT_DIR}/${data_type}/${ref}_reports_as_ref"
         echo "  Filtering ${data_type}/${ref}_reports_as_ref..."
@@ -136,7 +137,8 @@ echo ">>> Step 2 complete."
 # -----------------------------------------------------------------------------
 echo ""
 echo ">>> Step 3: Running MCQA evaluation..."
-for data_type in "orig_data" "shuffled_ans_choices_data"; do
+# for data_type in "orig_data" "shuffled_ans_choices_data"; do
+for data_type in "shuffled_ans_choices_data"; do
     echo "  Evaluating ${data_type}..."
     python src/mcqa_evaluation.py \
         --base_dir "${OUTPUT_DIR}" \
