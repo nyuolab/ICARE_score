@@ -4,7 +4,7 @@
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=128G
-#SBATCH --time=01:00:00
+#SBATCH --time=40:00:00
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=rd3571@nyu.edu
 
