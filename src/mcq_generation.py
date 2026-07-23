@@ -16,6 +16,7 @@ from typing import Dict, Any, Optional, List
 import numpy as np
 import torch
 from config import Config
+from prompt_templates import build_generation_prompt
 from utils import ensure_dir
 
 torch.manual_seed(123)
@@ -123,33 +124,8 @@ def parse_mcq(mcq_text):
     return questions
 
 def build_mcq_prompt(report, batch_n, previous_questions):
-    """Build the MCQ-generation prompt.
-
-    Identical to the original single-shot prompt when there are no
-    previous_questions. Otherwise prepends the already-asked questions and
-    adds one instruction to cover what's missing -- every other word of the
-    original instructions is unchanged.
-    """
-    prefix = ""
-    extra_instruction = ""
-    if previous_questions:
-        prefix = "Questions already generated for this report:\n" + \
-                 "\n".join(f"- {q}" for q in previous_questions) + "\n\n"
-        extra_instruction = "Do not repeat the questions listed above; cover parts of the report not addressed by them."
-
-    return (
-        prefix +
-        f"Please generate {batch_n} different multiple choice question answer pairs for the following radiology report: {report}. "
-        "The questions should be based on report and cannot be answered without the report."
-        f"{extra_instruction}"
-        "Please use the following format exactly as your life depends on sticking to these formats.:\n\n"
-        "**1: [Question text]**\n"
-        "A) [Option A]\n"
-        "B) [Option B]\n"
-        "C) [Option C]\n"
-        "D) [Option D]\n"
-        "Answer: [Correct answer]\n\n"
-    )
+    """Build the MCQ-generation prompt from the active external prompt pack."""
+    return build_generation_prompt(report, batch_n, previous_questions)
 
 
 def generate_mcqs_sequential(report, num_ques, batch_size, stop_threshold, url, api_key,
@@ -260,17 +236,7 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
                     while len(formatted_mcqs) < num_ques:
                         messages = [{
                             "role": "user",
-                            "content": (
-                                f"Please generate {num_ques} different multiple choice question answer pairs for the following radiology report: {report}. "
-                                "The questions should be based on report and cannot be answered without the report."
-                                "Please use the following format exactly as your life depends on sticking to these formats.:\n\n"
-                                "**1: [Question text]**\n"
-                                "A) [Option A]\n"
-                                "B) [Option B]\n"
-                                "C) [Option C]\n"
-                                "D) [Option D]\n"
-                                "Answer: [Correct answer]\n\n"
-                            )
+                            "content": build_mcq_prompt(report, num_ques, [])
                         }]
 
                         try:

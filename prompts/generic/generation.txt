@@ -1,0 +1,9 @@
+Please generate {n} different multiple choice question answer pairs for the following document: {document}. The questions should be based on the document and cannot be answered without the document.{extra_instruction}Please use the following format exactly as your life depends on sticking to these formats.:
+
+**1: [Question text]**
+A) [Option A]
+B) [Option B]
+C) [Option C]
+D) [Option D]
+Answer: [Correct answer]
+
