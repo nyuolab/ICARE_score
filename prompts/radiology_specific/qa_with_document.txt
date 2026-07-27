@@ -1,0 +1,17 @@
+Given the following radiology report:
+        "{document}"
+    
+        Answer the following question:
+        {question}
+    
+        Options:
+        A) {option_a}
+        B) {option_b}
+        C) {option_c}
+        D) {option_d}
+        
+        Your life depends on providing ONLY a single letter (A, B, C, or D) as your answer. 
+        Do not include any other text, punctuation, or explanation.
+        Format: Just the letter.
+        Example correct format: A
+        Example incorrect formats: A., The answer is A, Option A

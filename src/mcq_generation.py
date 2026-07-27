@@ -16,6 +16,7 @@ from typing import Dict, Any, Optional, List
 import numpy as np
 import torch
 from config import Config
+from prompt_templates import build_generation_prompt
 from utils import ensure_dir
 
 torch.manual_seed(123)
@@ -43,12 +44,15 @@ def make_llama_request(
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-    else:
+    elif Config.API_AUTH_HEADER_TYPE in ("api-key", "apikey"):
+        header_name = "api-key" if Config.API_AUTH_HEADER_TYPE == "api-key" else "apiKey"
         headers = {
-            "apiKey": api_key,
+            header_name: api_key,
             "accept": "application/json",
             "Content-Type": "application/json"
         }
+    else:
+        raise ValueError(f"Unsupported API_AUTH_HEADER_TYPE: {Config.API_AUTH_HEADER_TYPE}")
     
     data = {
         "model": model,
@@ -118,6 +122,11 @@ def parse_mcq(mcq_text):
     
     return questions
 
+def build_mcq_prompt(report, batch_n, previous_questions=None):
+    """Build the MCQ-generation prompt from the active DOCUMENT_TYPE pack."""
+    return build_generation_prompt(report, batch_n, previous_questions or [])
+
+
 def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
     api_key=Config.API_KEY, timeout=Config.GENERATION_TIMEOUT, max_tokens=Config.GENERATION_MAX_TOKENS, 
     temperature=Config.DEFAULT_TEMPERATURE, top_p=Config.DEFAULT_TOP_P, n=Config.DEFAULT_N, seed=Config.DEFAULT_SEED, model_name=Config.MODEL_NAME):
@@ -142,17 +151,7 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
                 while len(formatted_mcqs) < num_ques:
                     messages = [{
                         "role": "user",
-                        "content": (
-                            f"Please generate {num_ques} different multiple choice question answer pairs for the following radiology report: {report}. "
-                            "The questions should be based on report and cannot be answered without the report."
-                            "Please use the following format exactly as your life depends on sticking to these formats.:\n\n"
-                            "**1: [Question text]**\n"
-                            "A) [Option A]\n"
-                            "B) [Option B]\n"
-                            "C) [Option C]\n"
-                            "D) [Option D]\n"
-                            "Answer: [Correct answer]\n\n"
-                        )
+                        "content": build_mcq_prompt(report, num_ques, [])
                     }]
                     
                     try:

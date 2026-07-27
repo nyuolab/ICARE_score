@@ -35,8 +35,16 @@ class Config:
     # Filtering specific parameters
     FILTERING_MAX_TOKENS: int = int(os.getenv("RRGEVAL_FILTERING_MAX_TOKENS", "10"))
 
-    # API auth header type: "bearer" (standard, for vLLM/Ollama/OpenAI) or "apikey" (legacy private endpoint)
+    # API auth header type: "bearer" (standard, for vLLM/Ollama/OpenAI) or "apikey" / "api-key" (legacy/private)
     API_AUTH_HEADER_TYPE: str = os.getenv("RRGEVAL_API_AUTH_HEADER_TYPE", "bearer")
+
+    # Document type selects an internal prompt pack:
+    #   radiology -> prompts/radiology_specific (default)
+    #   generic   -> prompts/generic
+    DOCUMENT_TYPE: str = os.getenv("DOCUMENT_TYPE", "radiology")
+
+    # Maintainer override for prompt pack directory (optional; prefer DOCUMENT_TYPE)
+    PROMPT_DIR: str = os.getenv("ICARE_PROMPT_DIR", "")
 
     @classmethod
     def validate_config(cls) -> bool:

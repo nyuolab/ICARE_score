@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 import matplotlib.pyplot as plt
 from utils import make_llama_request, ensure_dir
 from config import Config
+from prompt_templates import build_qa_prompt
 import argparse
 
 
@@ -28,39 +29,12 @@ def get_model_prediction(
 ) -> Optional[str]:
     """Get model's prediction for a question."""
 
-    if pred_using_report_setting == "using_report":
-        prompt = f"""Given the following radiology report:
-        "{report}"
-    
-        Answer the following question:
-        {question}
-    
-        Options:
-        A) {options['A']}
-        B) {options['B']}
-        C) {options['C']}
-        D) {options['D']}
-        
-        Your life depends on providing ONLY a single letter (A, B, C, or D) as your answer. 
-        Do not include any other text, punctuation, or explanation.
-        Format: Just the letter.
-        Example correct format: A
-        Example incorrect formats: A., The answer is A, Option A"""
-    else:
-        prompt = f"""Answer the following question:
-        {question}
-    
-        Options:
-        A) {options['A']}
-        B) {options['B']}
-        C) {options['C']}
-        D) {options['D']}
-    
-        Your life depends on providing ONLY a single letter (A, B, C, or D) as your answer. 
-        Do not include any other text, punctuation, or explanation.
-        Format: Just the letter.
-        Example correct format: A
-        Example incorrect formats: A., The answer is A, Option A"""
+    prompt = build_qa_prompt(
+        document=report,
+        question=question,
+        options=options,
+        with_document=(pred_using_report_setting == "using_report"),
+    )
 
     
     return make_llama_request(
@@ -323,6 +297,10 @@ def main():
                       help='Perturbation type (default: char)')
     parser.add_argument('--predefined_ques_csv', type=str, default='',
                       help='Path to predefined questions CSV; skips gt/gen question-source loop and runs evaluation once')
+    parser.add_argument('--question_set', type=str, default='filtered',
+                      choices=['filtered', 'all'],
+                      help='filtered: mcqa_filtering/filtered_questions_shuffled.csv (default); '
+                           'all: mcqa_eval_input/all_questions.csv (no report-dependent filtering)')
 
     args = parser.parse_args()
 
@@ -390,8 +368,14 @@ def main():
         os.makedirs(output_dir, exist_ok=True)
 
         # Input files
-        ques_csv_file = os.path.join(base_directory, data_type,
-                                   f'{ques_reference}_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv')
+        if args.question_set == 'all':
+            ques_csv_file = os.path.join(
+                base_directory, data_type,
+                f'{ques_reference}_reports_as_ref/mcqa_eval_input/all_questions.csv')
+        else:
+            ques_csv_file = os.path.join(
+                base_directory, data_type,
+                f'{ques_reference}_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv')
 
         # Output file
         mcqa_eval_ans_predictions_output_csv_file = os.path.join(output_dir, f"mcqa_eval_answer_predictions.csv")
