@@ -35,11 +35,18 @@ from scipy import stats
 # ---------------------------------------------------------------------------
 BASE      = Path("/gpfs/data/oermannlab/users/rd3571")
 EVAL_DIR  = BASE / "ICARE_score/outputs/rexval/rexval_test_200/eval_seed_123/shuffled_ans_choices_data"
+TOPK20_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200_topk20/eval_seed_123/shuffled_ans_choices_data"
+TOPK8_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200_topk8/eval_seed_123/shuffled_ans_choices_data"
+RAD_PROMPT_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200_prompt_radiology/eval_seed_123/shuffled_ans_choices_data"
+GEN_PROMPT_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200_prompt_generic/eval_seed_123/shuffled_ans_choices_data"
 ALLQUES_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200_allques/eval_seed_123/shuffled_ans_choices_data"
 SEQ_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200/eval_seed_123_sequential_b10/shuffled_ans_choices_data"
 OPUS_EVAL_DIR   = BASE / "ICARE_score/outputs/rexval/rexval_test_200_opus46/eval_seed_123/shuffled_ans_choices_data"
 SONNET_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200_sonnet46/eval_seed_123/shuffled_ans_choices_data"
 GPT54_EVAL_DIR  = BASE / "ICARE_score/outputs/rexval/rexval_test_200_gpt54/eval_seed_123/shuffled_ans_choices_data"
+OPUS_ALLQUES_EVAL_DIR   = BASE / "ICARE_score/outputs/rexval/rexval_test_200_opus46_allques/eval_seed_123/shuffled_ans_choices_data"
+SONNET_ALLQUES_EVAL_DIR = BASE / "ICARE_score/outputs/rexval/rexval_test_200_sonnet46_allques/eval_seed_123/shuffled_ans_choices_data"
+GPT54_ALLQUES_EVAL_DIR  = BASE / "ICARE_score/outputs/rexval/rexval_test_200_gpt54_allques/eval_seed_123/shuffled_ans_choices_data"
 PRED_DIR  = BASE / "ICARE_score/outputs/rexval/predefined/eval_seed_123/mcqa_eval"
 BASELINES = BASE / "ICARE_score/outputs/rexval/rexval_test_200/baselines"
 REXVAL_CSV = BASE / "cxr_report_datasets/rexval/RexVal_test_icare_200.csv"
@@ -129,7 +136,28 @@ def _ap_avg(eval_dir):
 ap_opus   = _ap_avg(OPUS_EVAL_DIR)
 ap_sonnet = _ap_avg(SONNET_EVAL_DIR)
 ap_gpt54  = _ap_avg(GPT54_EVAL_DIR)
+ap_opus_allques   = _ap_avg(OPUS_ALLQUES_EVAL_DIR) if OPUS_ALLQUES_EVAL_DIR.is_dir() else None
+ap_sonnet_allques = _ap_avg(SONNET_ALLQUES_EVAL_DIR) if SONNET_ALLQUES_EVAL_DIR.is_dir() else None
+ap_gpt54_allques  = _ap_avg(GPT54_ALLQUES_EVAL_DIR) if GPT54_ALLQUES_EVAL_DIR.is_dir() else None
+if ap_opus_allques is None:
+    print(f"SKIP: {OPUS_ALLQUES_EVAL_DIR} not found — omitting ICARE Opus (all Q)")
+if ap_sonnet_allques is None:
+    print(f"SKIP: {SONNET_ALLQUES_EVAL_DIR} not found — omitting ICARE Sonnet (all Q)")
+if ap_gpt54_allques is None:
+    print(f"SKIP: {GPT54_ALLQUES_EVAL_DIR} not found — omitting ICARE GPT-5.4 (all Q)")
 ap_allques = _ap_avg(ALLQUES_EVAL_DIR)
+ap_topk20 = _ap_avg(TOPK20_EVAL_DIR) if TOPK20_EVAL_DIR.is_dir() else None
+ap_topk8 = _ap_avg(TOPK8_EVAL_DIR) if TOPK8_EVAL_DIR.is_dir() else None
+ap_rad_prompt = _ap_avg(RAD_PROMPT_EVAL_DIR) if RAD_PROMPT_EVAL_DIR.is_dir() else None
+ap_gen_prompt = _ap_avg(GEN_PROMPT_EVAL_DIR) if GEN_PROMPT_EVAL_DIR.is_dir() else None
+if ap_topk20 is None:
+    print(f"SKIP: {TOPK20_EVAL_DIR} not found — omitting ICARE Llama (topk20)")
+if ap_topk8 is None:
+    print(f"SKIP: {TOPK8_EVAL_DIR} not found — omitting ICARE Llama (topk8)")
+if ap_rad_prompt is None:
+    print(f"SKIP: {RAD_PROMPT_EVAL_DIR} not found — omitting ICARE Llama (rad file)")
+if ap_gen_prompt is None:
+    print(f"SKIP: {GEN_PROMPT_EVAL_DIR} not found — omitting ICARE Llama (generic)")
 
 # ---------------------------------------------------------------------------
 # Load ICARE predefined
@@ -174,10 +202,24 @@ merged["ap_gt"]     = ap_gt
 merged["ap_gen"]    = ap_gen
 merged["ap_avg"]    = ap_avg
 merged["ap_allques"] = ap_allques
+if ap_topk20 is not None:
+    merged["ap_topk20"] = ap_topk20
+if ap_topk8 is not None:
+    merged["ap_topk8"] = ap_topk8
+if ap_rad_prompt is not None:
+    merged["ap_rad_prompt"] = ap_rad_prompt
+if ap_gen_prompt is not None:
+    merged["ap_gen_prompt"] = ap_gen_prompt
 merged["ap_seq"]    = ap_seq
 merged["ap_opus"]   = ap_opus
 merged["ap_sonnet"] = ap_sonnet
 merged["ap_gpt54"]  = ap_gpt54
+if ap_opus_allques is not None:
+    merged["ap_opus_allques"] = ap_opus_allques
+if ap_sonnet_allques is not None:
+    merged["ap_sonnet_allques"] = ap_sonnet_allques
+if ap_gpt54_allques is not None:
+    merged["ap_gpt54_allques"] = ap_gpt54_allques
 merged["ap_pred"]   = ap_pred
 merged["crimson"]    = crimson_scores
 merged["green"]      = green_scores
@@ -197,10 +239,24 @@ merged["dis_gt"]      = 1 - merged["ap_gt"]   / 100
 merged["dis_gen"]     = 1 - merged["ap_gen"]  / 100
 merged["dis_avg"]     = 1 - merged["ap_avg"]  / 100
 merged["dis_allques"] = 1 - merged["ap_allques"] / 100
+if ap_topk20 is not None:
+    merged["dis_topk20"] = 1 - merged["ap_topk20"] / 100
+if ap_topk8 is not None:
+    merged["dis_topk8"] = 1 - merged["ap_topk8"] / 100
+if ap_rad_prompt is not None:
+    merged["dis_rad_prompt"] = 1 - merged["ap_rad_prompt"] / 100
+if ap_gen_prompt is not None:
+    merged["dis_gen_prompt"] = 1 - merged["ap_gen_prompt"] / 100
 merged["dis_seq"]     = 1 - merged["ap_seq"]  / 100
 merged["dis_opus"]    = 1 - merged["ap_opus"] / 100
 merged["dis_sonnet"]  = 1 - merged["ap_sonnet"] / 100
 merged["dis_gpt54"]   = 1 - merged["ap_gpt54"] / 100
+if ap_opus_allques is not None:
+    merged["dis_opus_allques"] = 1 - merged["ap_opus_allques"] / 100
+if ap_sonnet_allques is not None:
+    merged["dis_sonnet_allques"] = 1 - merged["ap_sonnet_allques"] / 100
+if ap_gpt54_allques is not None:
+    merged["dis_gpt54_allques"] = 1 - merged["ap_gpt54_allques"] / 100
 merged["dis_pred"]    = 1 - merged["ap_pred"] / 100
 merged["neg_crimson"]    = -merged["crimson"]
 merged["neg_green"]      = -merged["green"]
@@ -292,9 +348,16 @@ CORR_METRICS = [
     ("AlignScore",       "neg_alignscore"),
     ("CRIMSON",          "neg_crimson"),
     ("ICARE Opus",       "dis_opus"),
+    *([("ICARE Opus (all Q)", "dis_opus_allques")] if ap_opus_allques is not None else []),
     ("ICARE Sonnet",     "dis_sonnet"),
+    *([("ICARE Sonnet (all Q)", "dis_sonnet_allques")] if ap_sonnet_allques is not None else []),
     ("ICARE GPT-5.4",    "dis_gpt54"),
-    ("ICARE Llama",      "dis_avg"),
+    *([("ICARE GPT-5.4 (all Q)", "dis_gpt54_allques")] if ap_gpt54_allques is not None else []),
+    ("ICARE Llama (inline)", "dis_avg"),
+    *([("ICARE Llama (topk20)", "dis_topk20")] if ap_topk20 is not None else []),
+    *([("ICARE Llama (topk8)", "dis_topk8")] if ap_topk8 is not None else []),
+    *([("ICARE Llama (rad file)", "dis_rad_prompt")] if ap_rad_prompt is not None else []),
+    *([("ICARE Llama (generic)", "dis_gen_prompt")] if ap_gen_prompt is not None else []),
     ("ICARE Llama (all Q)", "dis_allques"),
     ("ICARE Llama SEQ",  "dis_seq"),
     ("ICARE Llama PRE",  "dis_pred"),
@@ -369,13 +432,18 @@ def latex_fmt_highlight(val, lo, hi, rank):
     return s
 
 LATEX_LABELS = {
-    "ICARE Llama":           r"\textbf{ICARE}$_{\textbf{Llama}}$",
+    "ICARE Llama (inline)":  r"\textbf{ICARE}$_{\textbf{Llama-inline}}$",
+    "ICARE Llama (rad file)": r"\textbf{ICARE}$_{\textbf{Llama-rad}}$",
+    "ICARE Llama (generic)": r"\textbf{ICARE}$_{\textbf{Llama-gen}}$",
     "ICARE Llama (all Q)":   r"\textbf{ICARE}$_{\textbf{Llama-ALLQ}}$",
     "ICARE Llama SEQ":       r"\textbf{ICARE}$_{\textbf{Llama-SEQ}}$",
     "ICARE Llama PRE":       r"\textbf{ICARE}$_{\textbf{Llama-PRE}}$",
     "ICARE Opus":            r"\textbf{ICARE}$_{\textbf{Opus}}$",
+    "ICARE Opus (all Q)":    r"\textbf{ICARE}$_{\textbf{Opus-ALLQ}}$",
     "ICARE Sonnet":          r"\textbf{ICARE}$_{\textbf{Sonnet}}$",
+    "ICARE Sonnet (all Q)":  r"\textbf{ICARE}$_{\textbf{Sonnet-ALLQ}}$",
     "ICARE GPT-5.4":         r"\textbf{ICARE}$_{\textbf{GPT54}}$",
+    "ICARE GPT-5.4 (all Q)": r"\textbf{ICARE}$_{\textbf{GPT54-ALLQ}}$",
     "CRIMSON":               r"CRIMSON*",
 }
 
@@ -561,14 +629,22 @@ def get_metric_top1(df_merged, col, ascending):
     return top1
 
 # (label, score_col, ascending) — ascending=True means lower score = better
+INLINE_LABEL = "ICARE Llama (inline) ◄"
 FOREST_METRICS = [
-    ("ICARE Opus",            "ap_opus",    False),
-    ("ICARE Sonnet",          "ap_sonnet",  False),
-    ("ICARE GPT-5.4",         "ap_gpt54",   False),
-    ("ICARE Llama ◄",         "ap_avg",     False),
+    (INLINE_LABEL,            "ap_avg",         False),
+    *([("ICARE Llama (topk20)", "ap_topk20", False)] if ap_topk20 is not None else []),
+    *([("ICARE Llama (topk8)", "ap_topk8", False)] if ap_topk8 is not None else []),
+    *([("ICARE Llama (rad file)", "ap_rad_prompt", False)] if ap_rad_prompt is not None else []),
+    *([("ICARE Llama (generic)", "ap_gen_prompt", False)] if ap_gen_prompt is not None else []),
     ("ICARE Llama (all Q)",   "ap_allques", False),
     ("ICARE Llama SEQ",       "ap_seq",     False),
     ("ICARE Llama PRE",       "ap_pred",    False),
+    ("ICARE Opus",            "ap_opus",    False),
+    *([("ICARE Opus (all Q)", "ap_opus_allques", False)] if ap_opus_allques is not None else []),
+    ("ICARE Sonnet",          "ap_sonnet",  False),
+    *([("ICARE Sonnet (all Q)", "ap_sonnet_allques", False)] if ap_sonnet_allques is not None else []),
+    ("ICARE GPT-5.4",         "ap_gpt54",   False),
+    *([("ICARE GPT-5.4 (all Q)", "ap_gpt54_allques", False)] if ap_gpt54_allques is not None else []),
     ("CRIMSON",               "crimson",    False),
     ("GREEN",             "green",      False),
     ("AlignScore",        "alignscore", False),
@@ -634,10 +710,10 @@ n_fm   = len(forest_per_rater)
 y_pos  = np.arange(n_fm)[::-1]
 jitter = np.linspace(-0.25, 0.25, len(RATERS))
 
-fig2, ax2 = plt.subplots(figsize=(13, 9))
+fig2, ax2 = plt.subplots(figsize=(14, 14))
 
 for row, y in zip(forest_per_rater, y_pos):
-    is_avg   = row["label"] == "ICARE Llama ◄"
+    is_avg   = row["label"] == INLINE_LABEL
     is_icare = row["label"].startswith("ICARE")
     color    = "#1565C0" if is_icare else "#555555"
     lw       = 2.0 if is_avg else 1.4
@@ -748,12 +824,12 @@ ir_cons_pct = np.mean(ir_cons_agrees)
 print(f"\nInter-rater vs consensus (mean per rater): {ir_cons_pct:.1f}%")
 
 # Draw Figure 3
-fig3, ax3 = plt.subplots(figsize=(13, 8))
+fig3, ax3 = plt.subplots(figsize=(14, 12))
 n_fd  = len(forest_consensus)
 y_pos = np.arange(n_fd)[::-1]
 
 for row, y in zip(forest_consensus, y_pos):
-    is_avg   = row["label"] == "ICARE Llama ◄"
+    is_avg   = row["label"] == INLINE_LABEL
     is_icare = row["label"].startswith("ICARE")
     color    = "#1565C0" if is_icare else "#555555"
     lw       = 2.0 if is_avg else 1.4

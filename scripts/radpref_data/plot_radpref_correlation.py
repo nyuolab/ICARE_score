@@ -13,6 +13,8 @@ Usage:
     python scripts/radpref_data/plot_radpref_correlation.py
 """
 
+from typing import Tuple
+
 import json
 from pathlib import Path
 
@@ -28,6 +30,10 @@ from scipy.stats import kendalltau, pearsonr
 # ---------------------------------------------------------------------------
 BASE = Path("/gpfs/data/oermannlab/users/rd3571")
 ICARE_SHUFFLED_OUT   = BASE / "ICARE_score/outputs/radpref/eval_seed_123/shuffled_ans_choices_data"
+ICARE_ALLQUES_OUT    = BASE / "ICARE_score/outputs/radpref/eval_seed_123_allques/shuffled_ans_choices_data"
+ICARE_TOPK20_OUT     = BASE / "ICARE_score/outputs/radpref/eval_seed_123_topk20/shuffled_ans_choices_data"
+ICARE_RAD_PROMPT_OUT = BASE / "ICARE_score/outputs/radpref/eval_seed_123_prompt_radiology/shuffled_ans_choices_data"
+ICARE_GEN_PROMPT_OUT = BASE / "ICARE_score/outputs/radpref/eval_seed_123_prompt_generic/shuffled_ans_choices_data"
 ICARE_SEQ_OUT         = BASE / "ICARE_score/outputs/radpref/eval_seed_123_sequential_b10/shuffled_ans_choices_data"
 ICARE_PREDEFINED_OUT = BASE / "ICARE_score/outputs/radpref/predefined/eval_seed_123/mcqa_eval"
 BASELINES_DIR        = BASE / "ICARE_score/outputs/radpref/baselines"
@@ -106,6 +112,35 @@ icare_gt_diff  = combined.loc[range(0, N), "Agreement_Percentage_gt"].values  - 
 icare_gen_diff = combined.loc[range(0, N), "Agreement_Percentage_gen"].values - combined.loc[range(N, 2*N), "Agreement_Percentage_gen"].values
 icare_diff     = combined.loc[range(0, N), "icare"].values                    - combined.loc[range(N, 2*N), "icare"].values
 
+def load_icare_shuffled_combined(shuffled_out: Path) -> pd.DataFrame:
+    gt_df  = pd.read_csv(shuffled_out / "gt_reports_as_ref/mcqa_eval/mcq_eval_report_level_stats.csv").set_index("Report_ID")
+    gen_df = pd.read_csv(shuffled_out / "gen_reports_as_ref/mcqa_eval/mcq_eval_report_level_stats.csv").set_index("Report_ID")
+    comb = gt_df.join(gen_df, how="left", lsuffix="_gt", rsuffix="_gen")
+    comb["icare"] = comb[["Agreement_Percentage_gt", "Agreement_Percentage_gen"]].mean(axis=1)
+    return comb
+
+
+def load_icare_shuffled_diff(shuffled_out: Path) -> np.ndarray:
+    comb = load_icare_shuffled_combined(shuffled_out)
+    return comb.loc[range(0, N), "icare"].values - comb.loc[range(N, 2*N), "icare"].values
+
+
+def load_icare_shuffled_c1_c2(shuffled_out: Path) -> Tuple[np.ndarray, np.ndarray]:
+    comb = load_icare_shuffled_combined(shuffled_out)
+    return (
+        comb.loc[range(0, N), "icare"].values,
+        comb.loc[range(N, 2*N), "icare"].values,
+    )
+
+icare_allques_diff = load_icare_shuffled_diff(ICARE_ALLQUES_OUT) if ICARE_ALLQUES_OUT.is_dir() else None
+if icare_allques_diff is None:
+    print(f"SKIP: {ICARE_ALLQUES_OUT} not found — omitting ICARE (all Q)")
+icare_topk20_diff = load_icare_shuffled_diff(ICARE_TOPK20_OUT) if ICARE_TOPK20_OUT.is_dir() else None
+if icare_topk20_diff is None:
+    print(f"SKIP: {ICARE_TOPK20_OUT} not found — omitting ICARE (topk20)")
+icare_rad_prompt_diff = load_icare_shuffled_diff(ICARE_RAD_PROMPT_OUT)
+icare_gen_prompt_diff = load_icare_shuffled_diff(ICARE_GEN_PROMPT_OUT)
+
 # ---------------------------------------------------------------------------
 # Load ICARE (shuffled, sequential MCQ generation) — gt, gen, and averaged
 # ---------------------------------------------------------------------------
@@ -163,7 +198,13 @@ computed = {
     "AlignScore":       compute_metric_corrs(alignscore_diff,  compute_ci=True),
     "CRIMSON":          compute_metric_corrs(crimson_diff,     compute_ci=True),
     "ICARE_predefined": compute_metric_corrs(icare_pred_diff,  compute_ci=True),
-    "ICARE":            compute_metric_corrs(icare_diff,       compute_ci=True),
+    "ICARE\n(inline)":  compute_metric_corrs(icare_diff,       compute_ci=True),
+    **({"ICARE\n(topk20)": compute_metric_corrs(icare_topk20_diff, compute_ci=True, rng=np.random.default_rng(45))}
+       if icare_topk20_diff is not None else {}),
+    "ICARE\n(rad file)": compute_metric_corrs(icare_rad_prompt_diff, compute_ci=True, rng=np.random.default_rng(43)),
+    "ICARE\n(generic)": compute_metric_corrs(icare_gen_prompt_diff, compute_ci=True, rng=np.random.default_rng(44)),
+    **({"ICARE\n(all Q)": compute_metric_corrs(icare_allques_diff, compute_ci=True, rng=np.random.default_rng(46))}
+       if icare_allques_diff is not None else {}),
     "ICARE_seq":        compute_metric_corrs(icare_seq_diff,   compute_ci=True, rng=RNG_SEQ),
 }
 
@@ -211,7 +252,11 @@ paper = {
     "AlignScore":          computed["AlignScore"],
     "CRIMSON":             computed["CRIMSON"],
     "ICARE\n(predefined)": computed["ICARE_predefined"],
-    "ICARE":               computed["ICARE"],
+    "ICARE\n(inline)":    computed["ICARE\n(inline)"],
+    **({"ICARE\n(topk20)": computed["ICARE\n(topk20)"]} if icare_topk20_diff is not None else {}),
+    "ICARE\n(rad file)":  computed["ICARE\n(rad file)"],
+    "ICARE\n(generic)":   computed["ICARE\n(generic)"],
+    **({"ICARE\n(all Q)": computed["ICARE\n(all Q)"]} if icare_allques_diff is not None else {}),
     "ICARE\n(sequential)": computed["ICARE_seq"],
 }
 
@@ -396,8 +441,13 @@ plt.close()
 # ---------------------------------------------------------------------------
 # Raw C1 / C2 score arrays (reuse already-loaded data)
 # ---------------------------------------------------------------------------
-icare_avg_C1  = combined.loc[range(0, N), "icare"].values
-icare_avg_C2  = combined.loc[range(N, 2*N), "icare"].values
+icare_inline_C1, icare_inline_C2 = load_icare_shuffled_c1_c2(ICARE_SHUFFLED_OUT)
+icare_rad_C1, icare_rad_C2 = load_icare_shuffled_c1_c2(ICARE_RAD_PROMPT_OUT)
+icare_gen_C1, icare_gen_C2 = load_icare_shuffled_c1_c2(ICARE_GEN_PROMPT_OUT)
+if icare_allques_diff is not None:
+    icare_allques_C1, icare_allques_C2 = load_icare_shuffled_c1_c2(ICARE_ALLQUES_OUT)
+if icare_topk20_diff is not None:
+    icare_topk20_C1, icare_topk20_C2 = load_icare_shuffled_c1_c2(ICARE_TOPK20_OUT)
 icare_seq_C1  = combined_seq.loc[range(0, N), "icare_seq"].values
 icare_seq_C2  = combined_seq.loc[range(N, 2*N), "icare_seq"].values
 icare_pred_C1 = pred_df.loc[range(0, N), "Agreement_Percentage"].values
@@ -412,10 +462,15 @@ bleu_C1   = rrg_df["bleu_score"].values[:N];      bleu_C2   = rrg_df["bleu_score
 rcq_C1    = -rrg_df["RadCliQ-v1"].values[:N];     rcq_C2    = -rrg_df["RadCliQ-v1"].values[N:]  # negated: RadCliQ is an error metric (higher=worse)
 
 # (label, C1_scores, C2_scores) — higher score = better
+INLINE_LABEL = "ICARE (inline) ◄"
 FOREST_METRICS = [
-    ("ICARE_AVG ◄",      icare_avg_C1,  icare_avg_C2),
-    ("ICARE_SEQ",         icare_seq_C1,  icare_seq_C2),
-    ("ICARE_PREDEFINED",  icare_pred_C1, icare_pred_C2),
+    (INLINE_LABEL,        icare_inline_C1, icare_inline_C2),
+    *([("ICARE (topk20)", icare_topk20_C1, icare_topk20_C2)] if icare_topk20_diff is not None else []),
+    ("ICARE (rad file)",  icare_rad_C1,    icare_rad_C2),
+    ("ICARE (generic)",   icare_gen_C1,    icare_gen_C2),
+    *([("ICARE (all Q)", icare_allques_C1, icare_allques_C2)] if icare_allques_diff is not None else []),
+    ("ICARE (sequential)", icare_seq_C1,   icare_seq_C2),
+    ("ICARE (predefined)", icare_pred_C1,  icare_pred_C2),
     ("CRIMSON",           crimson_C1,    crimson_C2),
     ("GREEN",             green_C1,      green_C2),
     ("AlignScore",        as_C1,         as_C2),
@@ -458,7 +513,7 @@ RATER_COLORS  = ["#0072B2", "#D55E00", "#009E73"]  # Wong colorblind-safe palett
 print("\nPer-rater alignment (bootstrap across cases):")
 forest_per_rater = []
 for label, C1, C2 in FOREST_METRICS:
-    rng = RNG_SEQ if label == "ICARE_SEQ" else RNG
+    rng = RNG_SEQ if label == "ICARE (sequential)" else RNG
     mp = metric_pref(C1, C2)
     per_rater_pcts = [alignment_pct(mp, rater_prefs[uid]) for uid in rater_ids]
     mean = np.mean(per_rater_pcts)
@@ -478,13 +533,13 @@ for label, C1, C2 in FOREST_METRICS:
     print(f"  {label:22s}: {mean:.1f}%  [{lo:.1f}, {hi:.1f}]  "
           f"raters={[round(p, 1) for p in per_rater_pcts]}")
 
-fig2, ax2 = plt.subplots(figsize=(12, 8))
+fig2, ax2 = plt.subplots(figsize=(12, 10))
 n_fm   = len(forest_per_rater)
 y_pos  = np.arange(n_fm)[::-1]
 jitter = np.linspace(-0.20, 0.20, len(rater_ids))
 
 for row, y in zip(forest_per_rater, y_pos):
-    is_avg   = row["label"] == "ICARE_AVG ◄"
+    is_avg   = row["label"] == INLINE_LABEL
     is_icare = row["label"].startswith("ICARE")
     color    = "#1565C0" if is_icare else "#555555"
     lw       = 2.0 if is_avg else 1.4
@@ -583,16 +638,16 @@ print(f"\nDecisive-consensus alignment (≥{THRESHOLD}/3, n={N_DECISIVE}):")
 forest_data = []
 for label, C1, C2 in FOREST_METRICS:
     mp = metric_pref(C1, C2)
-    pct, lo, hi = consensus_alignment_ci(mp, rng=(RNG_SEQ if label == "ICARE_SEQ" else None))
+    pct, lo, hi = consensus_alignment_ci(mp, rng=(RNG_SEQ if label == "ICARE (sequential)" else None))
     forest_data.append(dict(label=label, pct=pct, lo=lo, hi=hi))
     print(f"  {label:22s}: {pct:.1f}%  [{lo:.1f}, {hi:.1f}]")
 
-fig3, ax3 = plt.subplots(figsize=(10, 6))
+fig3, ax3 = plt.subplots(figsize=(10, 8))
 n_fd  = len(forest_data)
 y_pos = np.arange(n_fd)[::-1]
 
 for row, y in zip(forest_data, y_pos):
-    is_avg   = row["label"] == "ICARE_AVG ◄"
+    is_avg   = row["label"] == INLINE_LABEL
     is_icare = row["label"].startswith("ICARE")
     color    = "#1565C0" if is_icare else "#555555"
     lw       = 2.0 if is_avg else 1.4
