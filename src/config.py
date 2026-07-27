@@ -38,6 +38,10 @@ class Config:
     # API auth header type: "bearer" (standard, for vLLM/Ollama/OpenAI) or "apikey" (legacy private endpoint)
     API_AUTH_HEADER_TYPE: str = os.getenv("RRGEVAL_API_AUTH_HEADER_TYPE", "bearer")
 
+    # Folder with generation.txt + qa_with_document.txt
+    # Override: ICARE_PROMPT_DIR=prompts/generic
+    PROMPT_DIR: str = os.getenv("ICARE_PROMPT_DIR", "prompts/radiology_specific")
+
     @classmethod
     def validate_config(cls) -> bool:
         """Validate that required configuration is set."""

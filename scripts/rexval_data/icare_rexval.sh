@@ -4,7 +4,7 @@
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=128G
-#SBATCH --time=01:00:00
+#SBATCH --time=40:00:00
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=rd3571@nyu.edu
 
@@ -63,6 +63,11 @@ EVAL_SEED="${EVAL_SEED:-123}"
 NUM_QUESTIONS="${NUM_QUESTIONS:-60}"
 BASE_DATA_PATH="${RRGEVAL_BASE_DATA_PATH:-/gpfs/data/oermannlab/users/rd3571}"
 
+# Prompt pack: folder with generation.txt + qa_with_document.txt
+# Override via .env or: sbatch --export=ALL,ICARE_PROMPT_DIR=prompts/generic,...
+ICARE_PROMPT_DIR="${ICARE_PROMPT_DIR:-prompts/radiology_specific}"
+export ICARE_PROMPT_DIR
+
 RAW_INPUT_CSV="${RAW_INPUT_CSV:-${BASE_DATA_PATH}/cxr_report_datasets/rexval/RexVal_test.csv}"
 NORMALIZED_INPUT_CSV="${NORMALIZED_INPUT_CSV:-${BASE_DATA_PATH}/cxr_report_datasets/rexval/RexVal_test_icare_200.csv}"
 OUTPUT_DIR="${OUTPUT_DIR:-${ORIG_DIR}/outputs/rexval/rexval_test_200/eval_seed_${EVAL_SEED}}"
@@ -80,6 +85,7 @@ echo "Prepared input: ${NORMALIZED_INPUT_CSV}"
 echo "Output dir:     ${OUTPUT_DIR}"
 echo "Eval seed:      ${EVAL_SEED}"
 echo "Num questions:  ${NUM_QUESTIONS}"
+echo "Prompt dir:     ${ICARE_PROMPT_DIR}"
 echo "Labels CSV:     ${LABELS_CSV}"
 echo "============================================="
 echo ""

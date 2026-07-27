@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 import matplotlib.pyplot as plt
 from utils import make_llama_request, ensure_dir
 from config import Config
+from prompt_templates import build_qa_prompt
 import argparse
 
 
@@ -28,39 +29,12 @@ def get_model_prediction(
 ) -> Optional[str]:
     """Get model's prediction for a question."""
 
-    if pred_using_report_setting == "using_report":
-        prompt = f"""Given the following radiology report:
-        "{report}"
-    
-        Answer the following question:
-        {question}
-    
-        Options:
-        A) {options['A']}
-        B) {options['B']}
-        C) {options['C']}
-        D) {options['D']}
-        
-        Your life depends on providing ONLY a single letter (A, B, C, or D) as your answer. 
-        Do not include any other text, punctuation, or explanation.
-        Format: Just the letter.
-        Example correct format: A
-        Example incorrect formats: A., The answer is A, Option A"""
-    else:
-        prompt = f"""Answer the following question:
-        {question}
-    
-        Options:
-        A) {options['A']}
-        B) {options['B']}
-        C) {options['C']}
-        D) {options['D']}
-    
-        Your life depends on providing ONLY a single letter (A, B, C, or D) as your answer. 
-        Do not include any other text, punctuation, or explanation.
-        Format: Just the letter.
-        Example correct format: A
-        Example incorrect formats: A., The answer is A, Option A"""
+    prompt = build_qa_prompt(
+        document=report,
+        question=question,
+        options=options,
+        with_document=(pred_using_report_setting == "using_report"),
+    )
 
     
     return make_llama_request(
