@@ -47,6 +47,12 @@ EVAL_SEED="${EVAL_SEED:-123}"
 NUM_QUESTIONS="${NUM_QUESTIONS:-60}"
 BASE_DATA_PATH="${RRGEVAL_BASE_DATA_PATH:-/gpfs/data/oermannlab/users/rd3571}"
 
+
+# Prompt pack: folder with generation.txt + qa_with_document.txt
+# Override via .env or: sbatch --export=ALL,ICARE_PROMPT_DIR=prompts/generic,...
+ICARE_PROMPT_DIR="${ICARE_PROMPT_DIR:-prompts/radiology_specific}"
+export ICARE_PROMPT_DIR
+
 RAW_INPUT_JSON="${RAW_INPUT_JSON:-${BASE_DATA_PATH}/CRIMSON/RadPref/preference_data.json}"
 NORMALIZED_INPUT_CSV="${NORMALIZED_INPUT_CSV:-${BASE_DATA_PATH}/cxr_report_datasets/radpref/radpref_icare.csv}"
 OUTPUT_DIR="${OUTPUT_DIR:-${ORIG_DIR}/outputs/radpref/eval_seed_${EVAL_SEED}}"
@@ -61,6 +67,7 @@ echo "Prepared CSV:   ${NORMALIZED_INPUT_CSV}"
 echo "Output dir:     ${OUTPUT_DIR}"
 echo "Eval seed:      ${EVAL_SEED}"
 echo "Num questions:  ${NUM_QUESTIONS}"
+echo "Prompt dir:     ${ICARE_PROMPT_DIR}"
 echo "============================================="
 echo ""
 
