@@ -27,13 +27,21 @@ def make_llama_request(
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-    elif Config.API_AUTH_HEADER_TYPE in ("api-key", "apikey"):
-        header_name = "api-key" if Config.API_AUTH_HEADER_TYPE == "api-key" else "apiKey"
-        headers = {
-            header_name: api_key,
-            "accept": "application/json",
-            "Content-Type": "application/json"
-        }
+    elif Config.API_AUTH_HEADER_TYPE in ("api-key", "apikey", "bearer+api-key"):
+        # NYU Kong: api-key alone returns 401; Bearer + api-key works (same as experiments).
+        if Config.API_AUTH_HEADER_TYPE == "apikey":
+            headers = {
+                "apiKey": api_key,
+                "accept": "application/json",
+                "Content-Type": "application/json"
+            }
+        else:
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "api-key": api_key,
+                "accept": "application/json",
+                "Content-Type": "application/json"
+            }
     else:
         raise ValueError(f"Unsupported API_AUTH_HEADER_TYPE: {Config.API_AUTH_HEADER_TYPE}")
     
