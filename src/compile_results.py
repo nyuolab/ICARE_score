@@ -189,6 +189,12 @@ def main():
     parser.add_argument("--output",    required=True, help="Path for the output JSON file")
     parser.add_argument("--summary_csv", default="", help="Optional path for per-sample summary CSV")
     parser.add_argument("--timing_file", default="", help="Optional JSON file with pipeline step durations (seconds)")
+    parser.add_argument(
+        "--question_set",
+        default="filtered",
+        choices=["filtered", "all"],
+        help="filtered: use mcqa_filtering CSVs (default); all: use mcqa_eval_input/all_questions.csv",
+    )
     args = parser.parse_args()
 
     data_type = "shuffled_ans_choices_data"
@@ -200,13 +206,20 @@ def main():
     gt_mcqa  = _load_mcqa_json(f"{base}/gt_reports_as_ref/mcqa_data.json")
     gen_mcqa = _load_mcqa_json(f"{base}/gen_reports_as_ref/mcqa_data.json")
 
-    gt_filtered  = _load_filtered(f"{base}/gt_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv")
-    gen_filtered = _load_filtered(f"{base}/gen_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv")
+    if args.question_set == "all":
+        gt_ques_path = f"{base}/gt_reports_as_ref/mcqa_eval_input/all_questions.csv"
+        gen_ques_path = f"{base}/gen_reports_as_ref/mcqa_eval_input/all_questions.csv"
+    else:
+        gt_ques_path = f"{base}/gt_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv"
+        gen_ques_path = f"{base}/gen_reports_as_ref/mcqa_filtering/filtered_questions_shuffled.csv"
+
+    gt_filtered  = _load_filtered(gt_ques_path)
+    gen_filtered = _load_filtered(gen_ques_path)
 
     gt_eval  = _load_eval_predictions(f"{base}/gt_reports_as_ref/mcqa_eval/mcqa_eval_answer_predictions.csv")
     gen_eval = _load_eval_predictions(f"{base}/gen_reports_as_ref/mcqa_eval/mcqa_eval_answer_predictions.csv")
 
-    # Merge question text into eval predictions (it lives in filtered_questions)
+    # Merge question text into eval predictions (it lives in the question CSV)
     qt_cols = ["Report_ID", "Question_ID", "Question_Text"]
     gt_eval  = gt_eval.merge(gt_filtered[qt_cols],  on=["Report_ID", "Question_ID"], how="left")
     gen_eval = gen_eval.merge(gen_filtered[qt_cols], on=["Report_ID", "Question_ID"], how="left")
