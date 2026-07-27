@@ -55,12 +55,14 @@ INPUT: test_data/sample_iuxray_reports.csv
     │   Reads: ground_truth_report OR generated_report
     │   Produces: test_data/output/{orig_data,shuffled_ans_choices_data}/{gt,gen}_reports_as_ref/mcqa_data.json
     │
-    ├── Step 2: MCQ Filtering (src/mcq_filtering.py)
+    ├── Step 2: MCQ Filtering (src/mcq_filtering.py)  [default]
     │   Reads: mcqa_data.json from Step 1
     │   Produces: mcqa_filtering/filtered_questions_shuffled.csv (report-dependent questions only)
+    │   Optional: top-up to MIN_FILTERED_K keepers per report
+    │   Or SKIP_FILTERING=1: convert JSON → all_questions.csv (no filter)
     │
     ├── Step 3: MCQA Evaluation (src/mcqa_evaluation.py)
-    │   Reads: filtered_questions_shuffled.csv + original CSV (both report columns)
+    │   Reads: filtered or all-questions CSV + original CSV (both report columns)
     │   Produces: mcqa_eval/mcq_eval_dataset_level_agreement_stats.csv, report_level_stats, etc.
     │
     ├── Step 4: Compile Results (src/compile_results.py)  [run_eval_final_without_orig.sh only]
@@ -99,6 +101,50 @@ From the repo root:
 ```bash
 bash scripts/example_test/run_eval_final_without_orig.sh
 # or: sbatch scripts/example_test/run_eval_final_without_orig.sh  (SLURM)
+```
+
+#### Default settings
+
+With no extra env vars, the script:
+
+- Uses the model / endpoint from **`.env` only** (`ENV_FILE` unset)
+- Uses **`DOCUMENT_TYPE=radiology`** (radiology-report wording)
+- Runs **report-dependent filtering**
+- Does **not** enforce a minimum number of filtered questions per report (`MIN_FILTERED_K` unset → no top-up)
+- Evaluates **`shuffled_ans_choices_data` only** (no `orig_data`)
+- Compiles `icare_results.json`, `icare_results_summary.csv`, `pipeline_timing.json`
+
+#### Optional configuration
+
+**Document type** (`DOCUMENT_TYPE`) — chooses an internal prompt pack. Allowed values:
+
+| Value | Meaning |
+|-------|---------|
+| `radiology` (default) | Radiology-report wording |
+| `generic` | Neutral “document” wording |
+
+```bash
+DOCUMENT_TYPE=generic bash scripts/example_test/run_eval_final_without_orig.sh
+```
+
+**Different model / endpoint** — put overrides in a KEY=VALUE file (same pattern as our LLM experiments) and pass `ENV_FILE`. See `config/envs/example_model.sh`:
+
+```bash
+ENV_FILE=config/envs/example_model.sh bash scripts/example_test/run_eval_final_without_orig.sh
+```
+
+The script loads `.env` first, then sources `ENV_FILE` so URL / API key / auth / model name override the base settings.
+
+**Ensure minimum filtered questions** — after filtering, top up until each report has at least `N` keepers:
+
+```bash
+MIN_FILTERED_K=20 bash scripts/example_test/run_eval_final_without_orig.sh
+```
+
+**Skip filtering** — evaluate all generated questions (no report-dependent filter; ignores `MIN_FILTERED_K`):
+
+```bash
+SKIP_FILTERING=1 bash scripts/example_test/run_eval_final_without_orig.sh
 ```
 
 Results in `test_data/output/`:
