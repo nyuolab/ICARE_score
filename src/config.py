@@ -29,7 +29,7 @@ class Config:
     DEFAULT_SEED: int = int(os.getenv("RRGEVAL_SEED", "123"))
 
     # Generation specific parameters
-    GENERATION_MAX_TOKENS: int = int(os.getenv("RRGEVAL_GENERATION_MAX_TOKENS", "130000"))
+    GENERATION_MAX_TOKENS: int = int(os.getenv("RRGEVAL_GENERATION_MAX_TOKENS", "30000"))
     GENERATION_TIMEOUT: int = int(os.getenv("RRGEVAL_GENERATION_TIMEOUT", "600"))
 
     # Filtering specific parameters
