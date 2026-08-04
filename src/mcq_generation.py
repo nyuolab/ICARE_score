@@ -174,17 +174,27 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
                         
                         if response:
                             mcq_data = response["choices"][0]["message"]["content"]
+                            unformatted_blocks = [b for b in mcq_data.split("\n\n") if b.strip()]
                             parsed_mcqs = parse_mcq(mcq_data)
-                            
-                            # Only add MCQs that are in the desired format
+
+                            round_valid = 0
                             for mcq in parsed_mcqs:
-                                if (mcq["question_text"] and 
-                                    all(mcq["options"].values()) and 
+                                if (mcq["question_text"] and
+                                    all(mcq["options"].values()) and
                                     mcq["correct_answer"]):
                                     formatted_mcqs.append(mcq)
-                                    
+                                    round_valid += 1
+
                                 if len(formatted_mcqs) >= num_ques:
                                     break
+
+                            # All returned Qs well-formed but < num_ques -> stop retrying
+                            if (
+                                round_valid > 0
+                                and round_valid == len(unformatted_blocks)
+                                and len(formatted_mcqs) < num_ques
+                            ):
+                                break
 
                     except Timeout:
                         print(f"Request timed out for report: {report[:50]}...")
@@ -193,8 +203,8 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
                         print(f"Error processing report: {e}")
                         continue
                 
-                # Check if we have num_ques valid MCQs
-                if len(formatted_mcqs) == num_ques:
+                # Write if any questions (allows partial one-shot on short reports)
+                if len(formatted_mcqs) > 0:
                     report_data = {
                         "report": report,
                         "questions": formatted_mcqs[:num_ques]  # Ensure we only take num_ques questions
@@ -203,7 +213,7 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
                     json.dump(report_data, file)
                     file.write(',\n' if i < len(reports) - 1 else '\n')
                     file.flush()
-                    total_mcqs += num_ques
+                    total_mcqs += len(formatted_mcqs[:num_ques])
                     total_reports_processed += 1
 
             # Write the closing of the JSON structure
