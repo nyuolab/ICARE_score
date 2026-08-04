@@ -258,17 +258,27 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
 
                             if response:
                                 mcq_data = response["choices"][0]["message"]["content"]
+                                unformatted_blocks = [b for b in mcq_data.split("\n\n") if b.strip()]
                                 parsed_mcqs = parse_mcq(mcq_data)
 
-                                # Only add MCQs that are in the desired format
+                                round_valid = 0
                                 for mcq in parsed_mcqs:
                                     if (mcq["question_text"] and
                                         all(mcq["options"].values()) and
                                         mcq["correct_answer"]):
                                         formatted_mcqs.append(mcq)
+                                        round_valid += 1
 
                                     if len(formatted_mcqs) >= num_ques:
                                         break
+
+                                # All returned Qs well-formed but < num_ques → stop retrying
+                                if (
+                                    round_valid > 0
+                                    and round_valid == len(unformatted_blocks)
+                                    and len(formatted_mcqs) < num_ques
+                                ):
+                                    break
 
                         except Timeout:
                             print(f"Request timed out for report: {report[:50]}...")
@@ -277,9 +287,8 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
                             print(f"Error processing report: {e}")
                             continue
 
-                # Legacy mode requires exactly num_ques (unchanged behavior);
-                # sequential mode keeps whatever was collected, even if partial.
-                should_write = (len(formatted_mcqs) > 0) if use_sequential_generation else (len(formatted_mcqs) == num_ques)
+                # Write if any questions (allows partial one-shot on short reports)
+                should_write = len(formatted_mcqs) > 0
                 if should_write:
                     report_data = {
                         "report": report,
