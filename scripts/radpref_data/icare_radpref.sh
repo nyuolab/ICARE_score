@@ -33,6 +33,17 @@ else
     echo "Warning: .env file not found. Falling back to explicit defaults."
 fi
 
+# Load model-specific overrides (optional)
+ENV_FILE="${ENV_FILE:-}"
+if [ -n "$ENV_FILE" ] && [ -f "$ENV_FILE" ]; then
+    echo "Loading model overrides from $ENV_FILE ..."
+    set -a
+    source "$ENV_FILE"
+    set +a
+elif [ -n "$ENV_FILE" ]; then
+    echo "Warning: ENV_FILE set to $ENV_FILE but file not found."
+fi
+
 # Load conda (save/restore cwd in case ~/.bashrc changes it)
 ORIG_DIR=$(pwd)
 BASHRCSOURCED=0
