@@ -72,8 +72,10 @@ def make_llama_request(
         response = requests.post(url, headers=headers, json=data, timeout=timeout)
         response.raise_for_status()
         return response.json()
+    except Timeout:
+        raise
     except Exception as e:
-        print(f"Error in API call: {e}")
+        print(f"Error in API call: {e}", flush=True)
         return None
 def parse_mcq(mcq_text):
     """Parse MCQ text into structured format."""
@@ -214,6 +216,7 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
         # Set base random seed
         total_mcqs = 0
         total_reports_processed = 0
+        failed_report_indices = []
 
         with open(output_file, 'w') as file:
             # Write the opening of the JSON structure
@@ -225,6 +228,7 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
 
             for i, report in enumerate(reports):
                 print(f"[report {i+1}/{len(reports)}]", flush=True)
+                failure_reason = None
                 if use_sequential_generation:
                     formatted_mcqs = generate_mcqs_sequential(
                         report, num_ques, sequential_batch_size, sequential_stop_threshold,
@@ -233,6 +237,8 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
                 else:
                     # Generate MCQs until we have num_ques in the desired format
                     formatted_mcqs = []
+                    no_usable_streak = 0
+                    max_no_usable = int(os.getenv("MCQ_GEN_MAX_NO_USABLE", "3"))
                     while len(formatted_mcqs) < num_ques:
                         messages = [{
                             "role": "user",
@@ -256,50 +262,122 @@ def generate_and_write_mcqs(reports, num_ques, output_file, url=Config.API_URL,
                                 # frequency_penalty=0
                             )
 
-                            if response:
-                                mcq_data = response["choices"][0]["message"]["content"]
-                                unformatted_blocks = [b for b in mcq_data.split("\n\n") if b.strip()]
-                                parsed_mcqs = parse_mcq(mcq_data)
+                            if not response:
+                                no_usable_streak += 1
+                                print(
+                                    f"  warning: no API response ({no_usable_streak}/{max_no_usable})",
+                                    flush=True,
+                                )
+                                if no_usable_streak >= max_no_usable:
+                                    failure_reason = "no_usable_generation"
+                                    failed_report_indices.append(i + 1)
+                                    print(
+                                        f"  warning: did not generate questions for "
+                                        f"report {i+1}/{len(reports)} "
+                                        f"(no usable generation after {max_no_usable} attempts)",
+                                        flush=True,
+                                    )
+                                    formatted_mcqs = []
+                                    break
+                                continue
 
-                                round_valid = 0
-                                for mcq in parsed_mcqs:
-                                    if (mcq["question_text"] and
-                                        all(mcq["options"].values()) and
-                                        mcq["correct_answer"]):
-                                        formatted_mcqs.append(mcq)
-                                        round_valid += 1
+                            mcq_data = response["choices"][0]["message"]["content"]
+                            unformatted_blocks = [b for b in mcq_data.split("\n\n") if b.strip()]
 
-                                    if len(formatted_mcqs) >= num_ques:
-                                        break
+                            if len(unformatted_blocks) == 0:
+                                no_usable_streak += 1
+                                print(
+                                    f"  warning: empty/garbage response ({no_usable_streak}/{max_no_usable})",
+                                    flush=True,
+                                )
+                                if no_usable_streak >= max_no_usable:
+                                    failure_reason = "no_usable_generation"
+                                    failed_report_indices.append(i + 1)
+                                    print(
+                                        f"  warning: did not generate questions for "
+                                        f"report {i+1}/{len(reports)} "
+                                        f"(no usable generation after {max_no_usable} attempts)",
+                                        flush=True,
+                                    )
+                                    formatted_mcqs = []
+                                    break
+                                continue
 
-                                # All returned Qs well-formed but < num_ques → stop retrying
-                                if (
-                                    round_valid > 0
-                                    and round_valid == len(unformatted_blocks)
-                                    and len(formatted_mcqs) < num_ques
-                                ):
+                            # Got blocks (even if some fail parse) → reset streak; keep retrying 7/10 cases
+                            no_usable_streak = 0
+                            parsed_mcqs = parse_mcq(mcq_data)
+
+                            round_valid = 0
+                            for mcq in parsed_mcqs:
+                                if (mcq["question_text"] and
+                                    all(mcq["options"].values()) and
+                                    mcq["correct_answer"]):
+                                    formatted_mcqs.append(mcq)
+                                    round_valid += 1
+
+                                if len(formatted_mcqs) >= num_ques:
                                     break
 
+                            # All returned Qs well-formed but < num_ques → stop retrying
+                            # (requires round_valid > 0; 0==0 is NOT success)
+                            if (
+                                round_valid > 0
+                                and round_valid == len(unformatted_blocks)
+                                and len(formatted_mcqs) < num_ques
+                            ):
+                                break
+
                         except Timeout:
-                            print(f"Request timed out for report: {report[:50]}...")
+                            no_usable_streak += 1
+                            print(
+                                f"  warning: request timed out ({no_usable_streak}/{max_no_usable}): "
+                                f"{report[:50]}...",
+                                flush=True,
+                            )
+                            if no_usable_streak >= max_no_usable:
+                                failure_reason = "no_usable_generation"
+                                failed_report_indices.append(i + 1)
+                                print(
+                                    f"  warning: did not generate questions for "
+                                    f"report {i+1}/{len(reports)} "
+                                    f"(no usable generation after {max_no_usable} attempts)",
+                                    flush=True,
+                                )
+                                formatted_mcqs = []
+                                break
                             continue
                         except Exception as e:
-                            print(f"Error processing report: {e}")
+                            print(f"Error processing report: {e}", flush=True)
                             continue
 
-                # Write if any questions (allows partial one-shot on short reports)
-                should_write = len(formatted_mcqs) > 0
-                if should_write:
+                if len(formatted_mcqs) > 0:
                     report_data = {
                         "report": report,
-                        "questions": formatted_mcqs[:num_ques]  # Ensure we only take num_ques questions
+                        "questions": formatted_mcqs[:num_ques],
+                        "generation_status": "success",
                     }
-                    # Write the report data to file
-                    json.dump(report_data, file)
-                    file.write(',\n' if i < len(reports) - 1 else '\n')
-                    file.flush()
                     total_mcqs += len(formatted_mcqs[:num_ques])
-                    total_reports_processed += 1
+                elif failure_reason:
+                    report_data = {
+                        "report": report,
+                        "questions": [],
+                        "generation_status": "failed",
+                        "failure_reason": failure_reason,
+                    }
+                else:
+                    continue
+
+                json.dump(report_data, file)
+                file.write(',\n' if i < len(reports) - 1 else '\n')
+                file.flush()
+                total_reports_processed += 1
+
+            if failed_report_indices:
+                print(
+                    f"Generation summary: {len(failed_report_indices)} report(s) failed: "
+                    f"{failed_report_indices}",
+                    flush=True,
+                )
 
             # Write the closing of the JSON structure
             file.write(']\n}')

@@ -22,6 +22,8 @@ import sys
 from datetime import datetime
 from typing import Dict, List
 
+from requests.exceptions import Timeout
+
 import pandas as pd
 from tqdm import tqdm
 
@@ -59,6 +61,8 @@ def generate_topup_batch(
 ) -> List[dict]:
     """Generate up to batch_n new MCQs, avoiding previous_question_texts."""
     collected: List[dict] = []
+    no_usable_streak = 0
+    max_no_usable = int(os.getenv("MCQ_GEN_MAX_NO_USABLE", "3"))
     for _ in range(max_attempts):
         if len(collected) >= batch_n:
             break
@@ -78,12 +82,29 @@ def generate_topup_batch(
                 n=Config.DEFAULT_N,
                 stream=False,
             )
+        except Timeout:
+            no_usable_streak += 1
+            if no_usable_streak >= max_no_usable:
+                break
+            continue
         except Exception as e:
             print(f"  top-up generation error: {e}", flush=True)
+            no_usable_streak += 1
+            if no_usable_streak >= max_no_usable:
+                break
             continue
         if not response:
+            no_usable_streak += 1
+            if no_usable_streak >= max_no_usable:
+                break
             continue
         mcq_text = response["choices"][0]["message"]["content"]
+        if not [b for b in mcq_text.split("\n\n") if b.strip()]:
+            no_usable_streak += 1
+            if no_usable_streak >= max_no_usable:
+                break
+            continue
+        no_usable_streak = 0
         parsed = parse_mcq(mcq_text)
         for mcq in parsed:
             if (
