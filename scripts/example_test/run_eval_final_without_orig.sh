@@ -78,7 +78,7 @@ export DOCUMENT_TYPE
 SKIP_FILTERING="${SKIP_FILTERING:-0}"
 MIN_FILTERED_K="${MIN_FILTERED_K:-}"
 TOPUP_MAX_ROUNDS="${TOPUP_MAX_ROUNDS:-3}"
-TOPUP_BATCH_SIZE="${TOPUP_BATCH_SIZE:-10}"
+TOPUP_BATCH_SIZE="${TOPUP_BATCH_SIZE:-40}"
 
 if [ "${DOCUMENT_TYPE}" != "radiology" ] && [ "${DOCUMENT_TYPE}" != "generic" ]; then
     echo "Error: DOCUMENT_TYPE must be 'radiology' or 'generic' (got: ${DOCUMENT_TYPE})"
