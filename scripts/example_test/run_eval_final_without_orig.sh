@@ -11,7 +11,7 @@
 #
 # Same as run_eval.sh except:
 #   - Steps 2-3 run on shuffled_ans_choices_data only (see run_eval.sh for orig_data ablation)
-#   - Step 4 compiles icare_results.json + icare_results_summary.csv (+ step timing)
+#   - Step 4 compiles icare_results.json + icare_results_summary.csv + combined eval CSVs (+ step timing)
 #
 # Optional knobs (env vars):
 #   DOCUMENT_TYPE=radiology|generic   (default: radiology)
@@ -232,6 +232,8 @@ python src/compile_results.py \
     --input_csv   "${INPUT_CSV}" \
     --output      "${OUTPUT_DIR}/icare_results.json" \
     --summary_csv "${OUTPUT_DIR}/icare_results_summary.csv" \
+    --combined_gt_csv  "${OUTPUT_DIR}/icare_combined_gt_reports_as_ref.csv" \
+    --combined_gen_csv "${OUTPUT_DIR}/icare_combined_gen_reports_as_ref.csv" \
     --timing_file "${TIMING_FILE}" \
     --question_set "${QUESTION_SET}"
 echo ">>> Step 4 complete."
@@ -254,6 +256,8 @@ echo ""
 echo "Key result files:"
 echo "  - ${OUTPUT_DIR}/icare_results.json"
 echo "  - ${OUTPUT_DIR}/icare_results_summary.csv"
+echo "  - ${OUTPUT_DIR}/icare_combined_gt_reports_as_ref.csv"
+echo "  - ${OUTPUT_DIR}/icare_combined_gen_reports_as_ref.csv"
 echo "  - ${OUTPUT_DIR}/pipeline_timing.json"
 echo "  - ${OUTPUT_DIR}/shuffled_ans_choices_data/gt_reports_as_ref/mcqa_eval/mcq_eval_dataset_level_agreement_stats.csv"
 echo "  - ${OUTPUT_DIR}/shuffled_ans_choices_data/gen_reports_as_ref/mcqa_eval/mcq_eval_dataset_level_agreement_stats.csv"

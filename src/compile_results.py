@@ -15,6 +15,10 @@ The summary CSV contains one row per sample:
   sample_id, study_id, gt_agreement_pct, gen_agreement_pct,
   total_gt_questions, total_gen_questions
 
+Also writes two combined eval CSVs (question text + predictions):
+  icare_combined_gt_reports_as_ref.csv
+  icare_combined_gen_reports_as_ref.csv
+
 Usage:
     python src/compile_results.py \\
         --base_dir  <pipeline output dir>  \\
@@ -81,6 +85,30 @@ def _question_row_to_dict(row: pd.Series, extra_keys: Optional[List[str]] = None
             if k in row:
                 base[k] = row[k]
     return base
+
+
+
+def _write_combined_eval_csv(eval_df: pd.DataFrame, out_path: str) -> None:
+    """Join eval predictions with question text for flat analysis CSVs."""
+    cols = [
+        "Report_ID",
+        "Question_ID",
+        "Question_Text",
+        "Options",
+        "Correct_Answer",
+        "Predicted_Answer_Using_GT",
+        "Predicted_Answer_Using_Gen",
+    ]
+    missing = [c for c in cols if c not in eval_df.columns]
+    if missing:
+        raise ValueError(f"Combined CSV missing columns {missing} for {out_path}")
+    out = eval_df[cols].copy()
+    out["answers_agree"] = (
+        out["Predicted_Answer_Using_GT"] == out["Predicted_Answer_Using_Gen"]
+    )
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(out_path, index=False)
+    print(f"Wrote combined eval CSV to {out_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +218,16 @@ def main():
     parser.add_argument("--summary_csv", default="", help="Optional path for per-sample summary CSV")
     parser.add_argument("--timing_file", default="", help="Optional JSON file with pipeline step durations (seconds)")
     parser.add_argument(
+        "--combined_gt_csv",
+        default="",
+        help="Optional path for gt-ref combined predictions+questions CSV",
+    )
+    parser.add_argument(
+        "--combined_gen_csv",
+        default="",
+        help="Optional path for gen-ref combined predictions+questions CSV",
+    )
+    parser.add_argument(
         "--question_set",
         default="filtered",
         choices=["filtered", "all"],
@@ -273,6 +311,15 @@ def main():
     summary_csv = args.summary_csv or str(Path(args.output).with_name("icare_results_summary.csv"))
     pd.DataFrame(summary_rows).to_csv(summary_csv, index=False)
     print(f"Wrote summary CSV to {summary_csv}")
+
+    combined_gt = args.combined_gt_csv or str(
+        Path(args.base_dir) / "icare_combined_gt_reports_as_ref.csv"
+    )
+    combined_gen = args.combined_gen_csv or str(
+        Path(args.base_dir) / "icare_combined_gen_reports_as_ref.csv"
+    )
+    _write_combined_eval_csv(gt_eval, combined_gt)
+    _write_combined_eval_csv(gen_eval, combined_gen)
     # Quick sanity print
     for s in samples:
         print(
