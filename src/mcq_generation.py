@@ -1,6 +1,7 @@
 # src/mcq_generation.py
 import requests
 from requests.exceptions import Timeout
+import signal
 import json
 import pandas as pd
 import os
@@ -68,8 +69,19 @@ def make_llama_request(
         # "frequency_penalty": frequency_penalty
     }
     
+    def _alarm_handler(signum, frame):
+        raise Timeout("hard wall-clock API timeout")
+
+    wall = int(timeout) + 60
+    old_handler = signal.signal(signal.SIGALRM, _alarm_handler)
+    signal.alarm(wall)
     try:
-        response = requests.post(url, headers=headers, json=data, timeout=timeout)
+        response = requests.post(
+            url,
+            headers=headers,
+            json=data,
+            timeout=(30, timeout),
+        )
         response.raise_for_status()
         return response.json()
     except Timeout:
@@ -77,6 +89,9 @@ def make_llama_request(
     except Exception as e:
         print(f"Error in API call: {e}", flush=True)
         return None
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
 def parse_mcq(mcq_text):
     """Parse MCQ text into structured format."""
     questions = []
