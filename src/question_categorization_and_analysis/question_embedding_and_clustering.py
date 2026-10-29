@@ -142,9 +142,22 @@ def visualize_clusters(embeddings, cluster_labels, unique_questions, output_dir)
 
 def prepare_llm_prompt(cluster_representatives):
     """
-    Prepare a prompt for LLM to name each cluster
+    Prepare a prompt for LLM to name each cluster.
+    DOCUMENT_TYPE=generic uses document wording; anything else stays radiology.
     """
-    prompt = """You are an expert in radiology and medical natural language processing. Your task is to analyze clusters of medical questions (primarily from radiology reports) and generate a concise, medically accurate category name for each cluster.
+    if os.getenv("DOCUMENT_TYPE", "radiology") == "generic":
+        intro = """You are an expert in document understanding. Your task is to analyze clusters of questions about documents and generate a concise category name for each cluster.
+
+Instructions:
+For each cluster of questions, identify the common theme.
+
+For each cluster, generate a descriptive category name (2-6 words) that best captures the theme. The name should:
+- Be specific enough to be meaningful
+- Accurately represent the questions in that cluster
+- Be distinct from other cluster names
+"""
+    else:
+        intro = """You are an expert in radiology and medical natural language processing. Your task is to analyze clusters of medical questions (primarily from radiology reports) and generate a concise, medically accurate category name for each cluster.
 
 Instructions:
 For each cluster of questions, identify the common theme, considering aspects such as:
@@ -159,7 +172,8 @@ For each cluster, generate a descriptive category name (2-6 words) that best cap
 - Use appropriate medical terminology
 - Accurately represent the questions in that cluster
 - Be distinct from other cluster names
-
+"""
+    prompt = intro + """
 Please provide your answers in the following format:
 Category for Cluster 1: [Generated Category Name]
 Category for Cluster 2: [Generated Category Name]
@@ -262,10 +276,10 @@ def process_questions(combined_df, output_dir, model_path=None):
             f.write("\n")
     
     print(f"Representative questions saved to {os.path.join(output_dir, 'cluster_representatives.txt')}")
-    
-    # Visualize clusters
-    plot_df = visualize_clusters(embeddings, cluster_labels, unique_questions, output_dir)
-    
+
+    # Skip t-SNE so a small question set still reaches cluster naming and the agreement figure.
+    # visualize_clusters(embeddings, cluster_labels, unique_questions, output_dir)
+
     # Name clusters with LLaMA
     cluster_names = name_clusters_with_llama(cluster_representatives, output_dir)
     

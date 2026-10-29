@@ -7,15 +7,18 @@
 #SBATCH --output=logs/icare_question_categorization_%j.log
 
 # =============================================================================
-# Run question categorization and analysis on example test output.
-# Run scripts/example_test/run_eval.sh first to generate test_data/output/.
+# Run question categorization and analysis on a finished pipeline output.
+# Run scripts/example_test/run_eval_final_without_orig.sh first.
 #
 # Usage:
 #   cd ICARE_score
-#   sbatch scripts/example_test/run_question_categorization.sh
+#   sbatch scripts/example_test/run_question_categorization.sh [--input_dir DIR] [--output_dir DIR]
 #
 # Or interactively:
-#   bash scripts/example_test/run_question_categorization.sh
+#   bash scripts/example_test/run_question_categorization.sh [--input_dir DIR] [--output_dir DIR]
+#
+# --input_dir defaults to OUTPUT_DIR from .env (else test_data/output).
+# --output_dir defaults to outputs/question_categorization.
 # =============================================================================
 
 set -e
@@ -29,20 +32,32 @@ else
     echo "Warning: .env file not found. Make sure environment variables are set."
 fi
 
+INPUT_BASE="${OUTPUT_DIR:-test_data/output}"
+OUTPUT_DIR="outputs/question_categorization"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --input_dir) INPUT_BASE="$2"; shift 2 ;;
+        --output_dir) OUTPUT_DIR="$2"; shift 2 ;;
+        *) echo "Unknown argument: $1"; exit 1 ;;
+    esac
+done
+
 # Load conda (save/restore cwd since ~/.bashrc may change it)
 ORIG_DIR=$(pwd)
 source ~/.bashrc
 cd "$ORIG_DIR"
-conda activate rrg-eval-clean
+conda activate medcpt_embed
 
-# Paths relative to repo root (run from ICARE_score)
-INPUT_BASE="test_data/output"
-OUTPUT_DIR="test_data/output/question_categorization"
-METRICS='["gt_reports_as_ref", "gen_reports_as_ref"]'
+if [ ! -f "${INPUT_BASE}/icare_combined_gt_reports_as_ref.csv" ] || [ ! -f "${INPUT_BASE}/icare_combined_gen_reports_as_ref.csv" ]; then
+    echo "Error: ${INPUT_BASE} must contain icare_combined_gt_reports_as_ref.csv and icare_combined_gen_reports_as_ref.csv."
+    echo "Run scripts/example_test/run_eval_final_without_orig.sh first."
+    exit 1
+fi
 
-if [ ! -d "${INPUT_BASE}/shuffled_ans_choices_data" ]; then
-    echo "Error: ${INPUT_BASE}/shuffled_ans_choices_data not found."
-    echo "Run scripts/example_test/run_eval.sh first to generate the evaluation output."
+if [ -z "${MEDCPT_MODEL_PATH:-}" ] || [ ! -f "${MEDCPT_MODEL_PATH}/config.json" ]; then
+    echo "Error: set MEDCPT_MODEL_PATH in .env to a local MedCPT clone."
+    echo "  git clone https://huggingface.co/ncbi/MedCPT-Query-Encoder /path/to/MedCPT-Query-Encoder"
+    echo "  # In .env: MEDCPT_MODEL_PATH=/path/to/MedCPT-Query-Encoder"
     exit 1
 fi
 
@@ -59,9 +74,7 @@ mkdir -p "${OUTPUT_DIR}"
 echo ""
 echo ">>> Step 1: Creating combined MCQ data..."
 python src/question_categorization_and_analysis/create_combined_questions.py \
-    --metrics "$METRICS" \
-    --flat_base_dir "${INPUT_BASE}" \
-    --metrics "$METRICS" \
+    --pipeline_dir "${INPUT_BASE}" \
     --output_dir "${OUTPUT_DIR}"
 
 COMBINED_CSV="${OUTPUT_DIR}/combined_mcqa_data.csv"

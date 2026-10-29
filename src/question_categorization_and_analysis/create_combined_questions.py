@@ -30,8 +30,30 @@ def parse_arguments():
                         help='Output directory for combined data')
     parser.add_argument('--flat_base_dir', type=str, default='',
                         help='Flat base dir for test data (structure: flat_base_dir/shuffled_ans_choices_data/{metric}/mcqa_filtering/ and mcqa_eval/). When set, ignores base_dir and uses this simpler structure.')
+    parser.add_argument('--pipeline_dir', type=str, default='',
+                        help='Pipeline OUTPUT_DIR containing icare_combined_gt_reports_as_ref.csv and icare_combined_gen_reports_as_ref.csv.')
     
     return parser.parse_args()
+
+def load_pipeline_combined(pipeline_dir):
+    """Stack the two combined question CSVs written by run_eval_final_without_orig.sh."""
+    frames = []
+    for metric, name in (
+        ("gt_reports_as_ref", "icare_combined_gt_reports_as_ref.csv"),
+        ("gen_reports_as_ref", "icare_combined_gen_reports_as_ref.csv"),
+    ):
+        path = os.path.join(pipeline_dir, name)
+        if not os.path.exists(path):
+            print(f"Missing {path}")
+            return None
+        df = pd.read_csv(path)
+        df["metric"] = metric
+        df["dataset"] = "example_test"
+        df["model_name"] = "example_test"
+        df["model_seed"] = 1
+        df["eval_seed"] = 123
+        frames.append(df)
+    return pd.concat(frames, ignore_index=True)
 
 def load_and_combine_data_flat(flat_base_dir, metrics):
     """
@@ -166,8 +188,11 @@ def main():
     # Parse command line arguments
     args = parse_arguments()
     
-    # Flat mode for test data
-    if args.flat_base_dir:
+    # Two combined CSVs from the deployment pipeline
+    if args.pipeline_dir:
+        print(f"Loading pipeline combined CSVs from {args.pipeline_dir}")
+        combined_df = load_pipeline_combined(args.pipeline_dir)
+    elif args.flat_base_dir:
         metrics = ast.literal_eval(args.metrics)
         print("Configuration (flat/test mode):")
         print(f"Flat base directory: {args.flat_base_dir}")

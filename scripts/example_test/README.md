@@ -67,12 +67,17 @@ INPUT: test_data/sample_iuxray_reports.csv
     │
     ├── Step 4: Compile Results (src/compile_results.py)  [run_eval_final_without_orig.sh only]
     │   Reads: Step 1–3 outputs under shuffled_ans_choices_data/
-    │   Produces: icare_results.json, icare_results_summary.csv, pipeline_timing.json
+    │   Produces: icare_results.json, icare_results_summary.csv, pipeline_timing.json,
+    │             icare_combined_gt_reports_as_ref.csv, icare_combined_gen_reports_as_ref.csv
     │
     └── Step 5 (optional): Question Categorization
-        Reads: filtered_questions_shuffled.csv + mcqa_eval_answer_predictions.csv from Step 2 & 3
-        Produces: question_categorization/combined_mcqa_data.csv, clustered_questions_with_names.csv,
-                  cluster_names.json, analysis/all_models_gt_vs_gen_agreement.png
+        Reads the two question files from Step 4 and combines them:
+          icare_combined_gt_reports_as_ref.csv
+          icare_combined_gen_reports_as_ref.csv
+        Embeds those questions, clusters them, and names each cluster.
+        Produces cluster-level scores (ICARE-GT vs ICARE-GEN per cluster)
+          plus the cluster names:
+          analysis/all_models_gt_vs_gen_agreement.png, cluster_names.json
 ```
 
 **Default script:** `run_eval_final_without_orig.sh` → Steps 1–4 on `shuffled_ans_choices_data`
@@ -85,7 +90,7 @@ INPUT: test_data/sample_iuxray_reports.csv
 |--------|-------------|
 | `run_eval_final_without_orig.sh` | End-to-end pipeline (Steps 1–4): same as `run_eval.sh` but Steps 2–3 on `shuffled_ans_choices_data` only; writes `icare_results.json`, `icare_results_summary.csv`, `pipeline_timing.json` |
 | `run_eval.sh` | Steps 1–3 on **both** `orig_data` and `shuffled_ans_choices_data` (includes orig_data ablation steps) |
-| `run_question_categorization.sh` | Optional question categorization. Run an eval script first. |
+| `run_question_categorization.sh` | Optional. Combines the two Step 4 question files, clusters them, and writes cluster-level ICARE-GT vs ICARE-GEN scores plus cluster names. |
 
 ## Usage
 
@@ -147,10 +152,12 @@ MIN_FILTERED_K=20 bash scripts/example_test/run_eval_final_without_orig.sh
 SKIP_FILTERING=1 bash scripts/example_test/run_eval_final_without_orig.sh
 ```
 
-Results in `test_data/output/`:
+Results in `test_data/output/` (or whatever `OUTPUT_DIR` you set):
 - `icare_results.json` — per-sample detail + step timing
 - `icare_results_summary.csv` — one row per sample (agreement %, question counts)
 - `pipeline_timing.json` — step1/2/3 durations (seconds)
+- `icare_combined_gt_reports_as_ref.csv` — questions from the ground-truth report, with both answers
+- `icare_combined_gen_reports_as_ref.csv` — questions from the generated report, with both answers
 
 To also run filtering and evaluation on `orig_data` (answer-order ablation):
 
@@ -160,16 +167,42 @@ bash scripts/example_test/run_eval.sh
 
 ### 3. (Optional) Question categorization
 
-Run after Steps 1–3 (either eval script):
+Run this after the pipeline. It reads the two question files that run wrote, `icare_combined_gt_reports_as_ref.csv` and `icare_combined_gen_reports_as_ref.csv`, combines them, groups similar questions into clusters, and names each cluster. It then writes cluster-level scores: for each cluster, agreement on questions from the ground-truth report (ICARE-GT) against agreement on questions from the generated report (ICARE-GEN).
+
+`--input_dir` is the pipeline output folder that contains those two files. Use the folder from the run you want to score.
+
+One-time setup. This step uses its own environment, not the pipeline environment:
 
 ```bash
-bash scripts/example_test/run_question_categorization.sh
+conda create -n medcpt_embed python=3.10 -y
+conda activate medcpt_embed
+pip install torch transformers scikit-learn pandas matplotlib tqdm
 ```
 
-Results in `test_data/output/question_categorization/`.
+Clone MedCPT, then add that folder to `.env`:
 
-**If compute nodes lack Hugging Face access**, pre-download MedCPT and set in `.env`:
 ```bash
 git clone https://huggingface.co/ncbi/MedCPT-Query-Encoder /path/to/MedCPT-Query-Encoder
-# In .env: MEDCPT_MODEL_PATH=/path/to/MedCPT-Query-Encoder
 ```
+
+```bash
+MEDCPT_MODEL_PATH=/path/to/MedCPT-Query-Encoder
+```
+
+From the repo root:
+
+```bash
+bash scripts/example_test/run_question_categorization.sh \
+  --input_dir /path/to/pipeline/output \
+  --output_dir /path/to/cluster_results
+# or: sbatch scripts/example_test/run_question_categorization.sh --input_dir /path/to/pipeline/output --output_dir /path/to/cluster_results
+```
+
+`--input_dir` defaults to `OUTPUT_DIR` in `.env`. `--output_dir` defaults to `outputs/question_categorization`, outside the pipeline folder, so a later pipeline run does not delete these results.
+
+Cluster names are generated with the same model settings already in `.env`. The naming prompt is written for radiology chest X-ray reports. For a different task, edit `prepare_llm_prompt` in `src/question_categorization_and_analysis/question_embedding_and_clustering.py`.
+
+Results:
+
+- `<output_dir>/analysis/all_models_gt_vs_gen_agreement.png` — cluster-level ICARE-GT vs ICARE-GEN scores, and the cluster-name table
+- `<output_dir>/cluster_names.json` — the cluster names
