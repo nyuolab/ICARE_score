@@ -6,9 +6,9 @@
 
 ## Label consistency per model
 
-- **chexpert-mimic-cxr-findings-baseline**: 75.0% clusters same label in all 5 seeds (size-weighted 78.0%). Lung Lobe Abnormality same=1; Calcified Granuloma Location same=1.
-- **maira-2**: 55.0% clusters same label in all 5 seeds (size-weighted 61.2%). Lung Lobe Abnormality same=1; Calcified Granuloma Location same=1.
-- **mimic-cxr-findings-baseline**: 65.0% clusters same label in all 5 seeds (size-weighted 63.2%). Lung Lobe Abnormality same=1; Calcified Granuloma Location same=1.
+- **chexpert-mimic-cxr-findings-baseline**: 85.0% clusters same label in all 5 seeds (size-weighted 84.4%). Lung Lobe Abnormality same=1; Calcified Granuloma Location same=1.
+- **maira-2**: 50.0% clusters same label in all 5 seeds (size-weighted 50.1%). Lung Lobe Abnormality same=1; Calcified Granuloma Location same=1.
+- **mimic-cxr-findings-baseline**: 70.0% clusters same label in all 5 seeds (size-weighted 64.9%). Lung Lobe Abnormality same=1; Calcified Granuloma Location same=1.
 
 ## Tracked concepts across seeds
 
