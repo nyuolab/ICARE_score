@@ -28,3 +28,22 @@ logs/
 .DS_Store
 Thumbs.db
 
+
+# Revision R2 large intermediates (keep summary.md, figures, gate.md, plan)
+results/revision_r2/**/clustered_questions_K*.csv
+results/revision_r2/**/clustered_questions_with_names_K*.csv
+results/revision_r2/**/scores_*.csv
+results/revision_r2/**/correspondence_K*.csv
+results/revision_r2/**/*.npy
+results/revision_r2/**/concept_tracking.csv
+results/revision_r2/**/consistency_by_K.csv
+results/revision_r2/**/correspondence_summary.csv
+results/revision_r2/**/scores_by_eval_seed.csv
+results/revision_r2/**/across_seed_summary.csv
+results/revision_r2/**/label_consistency.csv
+results/revision_r2/**/instance_counts.csv
+results/revision_r2/**/report_jaccard.csv
+results/revision_r2/**/question_overlap.csv
+results/revision_r2/**/_gate/
+results/revision_r2/**/logs/
+results/revision_r2/**/naming_K*/
