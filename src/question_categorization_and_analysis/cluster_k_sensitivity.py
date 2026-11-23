@@ -325,32 +325,46 @@ def consistency_metrics(
         orig_q = {oid: {q for q, o in q_to_k20.items() if int(o) == oid} for oid in range(20)}
         mdf = cq_new[cq_new["model_name"] == model]
         orig_deltas, mapped_deltas = [], []
+        dropped: List[int] = []
+        # Mapped delta = instance-weighted mean over new clusters with defined delta only
+        # (re-normalise). Drop orig cluster if >50% of its instances land in undefined
+        # new clusters (n_gen=0, n_gt=0, or non-finite delta).
         for oid in range(20):
             if oid not in so.index:
+                dropped.append(oid)
+                continue
+            if not np.isfinite(so.loc[oid, "delta"]):
+                dropped.append(oid)
                 continue
             qs = orig_q[oid]
             sub = mdf[mdf["Question_Text"].isin(qs)]
             if sub.empty:
+                dropped.append(oid)
                 continue
-            shares = sub.groupby("cluster_id").size().astype(float)
-            shares = shares / shares.sum()
-            wmean = 0.0
-            ok = True
-            for cid, sh in shares.items():
-                if int(cid) not in sn.index or not np.isfinite(sn.loc[int(cid), "delta"]):
-                    ok = False
-                    break
-                wmean += float(sh) * float(sn.loc[int(cid), "delta"])
-            if not ok or not np.isfinite(so.loc[oid, "delta"]):
+            counts = sub.groupby("cluster_id").size().astype(float)
+            total = float(counts.sum())
+            defined_w = 0.0
+            wmean_num = 0.0
+            for cid, cnt in counts.items():
+                cid_i = int(cid)
+                sh = float(cnt) / total
+                if cid_i not in sn.index or not np.isfinite(sn.loc[cid_i, "delta"]):
+                    continue
+                defined_w += sh
+                wmean_num += sh * float(sn.loc[cid_i, "delta"])
+            undefined_frac = 1.0 - defined_w
+            if undefined_frac > 0.5 or defined_w <= 0.0:
+                dropped.append(oid)
                 continue
             orig_deltas.append(float(so.loc[oid, "delta"]))
-            mapped_deltas.append(wmean)
+            mapped_deltas.append(wmean_num / defined_w)
         n_used = len(orig_deltas)
         if n_used >= 3:
             rho, _ = spearmanr(orig_deltas, mapped_deltas)
             rho = float(rho) if np.isfinite(rho) else float("nan")
         else:
             rho = float("nan")
+        dropped_s = ",".join(str(x) for x in sorted(dropped)) if dropped else "none"
 
         lab_map = sn["label"].to_dict()
         inst = mdf.copy()
@@ -369,6 +383,7 @@ def consistency_metrics(
                 "pct_label_match_best": pct_a,
                 "spearman_delta": rho,
                 "spearman_n_clusters_used": n_used,
+                "spearman_dropped_clusters": dropped_s,
                 "share_omission_instances": share_om,
                 "share_hallucination_instances": share_hall,
                 "n_low_n_clusters": n_low,
@@ -742,10 +757,10 @@ def write_top_summary(out_dir: Path, results: Dict[str, Dict], stored_names: Dic
     # Side-by-side consistency table
     lines += ["## Consistency side-by-side (all vs seed_1)", ""]
     lines.append(
-        "| K | Model | mode | label-match% vs K=20 | Spearman (n) | "
+        "| K | Model | mode | label-match% vs K=20 | Spearman (n) | dropped | "
         "omission% | hallucination% | n_low_n |"
     )
-    lines.append("|---|---|---|---|---|---|---|---|")
+    lines.append("|---|---|---|---|---|---|---|---|---|")
     # merge
     frames = []
     for mode, res in results.items():
@@ -756,9 +771,11 @@ def write_top_summary(out_dir: Path, results: Dict[str, Dict], stored_names: Dic
     for _, r in cons_all.sort_values(["K", "Model", "seeds_mode"]).iterrows():
         sp = r.spearman_delta
         sp_s = f"{sp:.3f}" if sp == sp else "nan"
+        dropped = getattr(r, "spearman_dropped_clusters", "") or ""
         lines.append(
             f"| {int(r.K)} | {MODEL_SHORT.get(r.Model, r.Model)} | {r['seeds_mode']} | "
             f"{r.pct_label_match_best:.1f} | {sp_s} ({int(r.spearman_n_clusters_used)}) | "
+            f"{dropped or '—'} | "
             f"{100*r.share_omission_instances:.1f} | {100*r.share_hallucination_instances:.1f} | "
             f"{int(r.n_low_n_clusters)} |"
         )
@@ -798,6 +815,13 @@ def write_top_summary(out_dir: Path, results: Dict[str, Dict], stored_names: Dic
         "",
         "## Notes",
         "",
+        "- Spearman mapped delta: question-instance-weighted mean over **new clusters with defined "
+        "delta only** (re-normalised). An original cluster is dropped only if **>50%** of its "
+        "instances fall in undefined new clusters (`n_gen=0`, `n_gt=0`, or non-finite delta). "
+        "`consistency_by_K.csv` reports `spearman_n_clusters_used` and `spearman_dropped_clusters`.",
+        "- At K=30, some new clusters can be GEN-empty (often GT-source questions about "
+        "de-identified `XXXX` text → `n_gen=0`, undefined delta). Mapped deltas ignore those "
+        "clusters unless an original cluster has >50% of instances there. See scores_K30 / report.",
         "- `--name` is implemented but was not run in this final pass; K≠20 points use cluster IDs.",
         "",
     ]

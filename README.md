@@ -236,6 +236,8 @@ bash scripts/iuxray_data/question_categorization_and_analysis/run_cluster_k_sens
 
 Tracked concept names: **Lung Lobe Abnormality**, **Calcified Granuloma Location**. Cluster IDs are internal keys / point labels until names exist (K=20 uses stored names).
 
+Exp 4 Spearman (consistency b): mapped delta is the instance-weighted mean over new clusters with a **defined** delta only (weights re-normalised; clusters with `n_gen=0` or `n_gt=0` are ignored). An original K=20 cluster is dropped from Spearman only if **>50%** of its instances fall in undefined new clusters. Outputs list `spearman_n_clusters_used` and `spearman_dropped_clusters` per model/K/mode.
+
 
 ---
 

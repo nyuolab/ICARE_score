@@ -22,7 +22,7 @@
 4. Can pneumothorax be present according to the report?
 5. Does the report mention pneumothorax as a diagnosis?
 
-=== Cluster 3 (5187 questions) ===
+=== Cluster 3 (5181 questions) ===
 
 1. What is the condition of the lung volumes as mentioned in the report?
 2. What does the report specifically mention about lung volumes?
@@ -38,7 +38,7 @@
 4. Are there other relevant findings in the report aside from the mentioned conditions?
 5. Which of the following conditions is mentioned as a possible finding in the report?
 
-=== Cluster 5 (12338 questions) ===
+=== Cluster 5 (12339 questions) ===
 
 1. What does the report imply about the overall condition of the lungs?
 2. Are the lungs clear of any conditions according to the report?
@@ -46,7 +46,7 @@
 4. What does the report imply about the condition of the lungs?
 5. What does the report indicate about the condition of both lungs?
 
-=== Cluster 6 (7088 questions) ===
+=== Cluster 6 (7092 questions) ===
 
 1. Is there any mention of a focal airspace opacity in the lungs?
 2. Is there a mention of any focal area of opacity in the lungs?
@@ -78,7 +78,7 @@
 4. What can be said about the presence of a large opacity in the right lower lobe?
 5. Is the right lower lung opacity due to a significant pathological condition?
 
-=== Cluster 10 (8375 questions) ===
+=== Cluster 10 (8376 questions) ===
 
 1. What does the report indicate about the presence of a pleural effusion?
 2. What does the report indicate about the presence of pleural effusions?
