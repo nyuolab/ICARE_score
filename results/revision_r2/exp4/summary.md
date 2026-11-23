@@ -50,3 +50,6 @@
 ## Unexpected / notes
 
 - See gate.md for model-seed MCQ nondeterminism.
+
+- At K=30, Spearman (b) is NaN for all models because some new clusters have `n_gen=0` (no gen_reports_as_ref instances), so mapped deltas contain NaN.
+- Some clusters at finer K have NaN bootstrap CIs (sparse GEN rows under report resampling) and are labeled **balanced** by the CI rule fallback.

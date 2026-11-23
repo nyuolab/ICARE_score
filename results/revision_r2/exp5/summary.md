@@ -38,3 +38,7 @@
 ## Unexpected / notes
 
 - See ../exp4/gate.md for model-seed MCQ nondeterminism (gate c).
+
+- **Calcified Granuloma Location / mimic-cxr-findings-baseline:** large negative delta (mean ≈ −0.85) but all 5 seeds labeled balanced because GEN instance counts are tiny (11–18 per seed) → bootstrap CI is NaN under report resampling. Treat label as unreliable; flag via instance_counts (`flag_lt_30_any_seed`).
+- CheXpert and MAIRA on that concept also stay balanced across seeds (CheXpert mean delta ≈ +0.11; MAIRA ≈ −0.05).
+- Lung Lobe Abnormality labels are stable: omission for CheXpert/MIMIC (5/5 seeds), balanced for MAIRA (5/5).
