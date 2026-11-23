@@ -1,44 +1,48 @@
-# Exp 5 summary — eval-seed consistency
+# Exp 5 summary — eval-seed consistency (final)
 
 - sklearn: `1.3.2`
-- Unit: eval_seed; each seed pools all 5 model seeds (Fig. 4 Methods).
-- Stored K=20 labels; no re-clustering.
+- Stored K=20 labels/names; no re-clustering.
+- Labels: Fig. 4 rule (GT < GEN → omission; GT > GEN → hallucination).
+- Modes: `model_seeds_all` (primary) and `model_seed_1`.
 
-## Label consistency per model
+## Side-by-side: both model-seed modes
 
-- **chexpert-mimic-cxr-findings-baseline**: 85.0% clusters same label in all 5 seeds (size-weighted 84.4%). Lung Lobe Abnormality same=1; Calcified Granuloma Location same=1.
-- **maira-2**: 50.0% clusters same label in all 5 seeds (size-weighted 50.1%). Lung Lobe Abnormality same=1; Calcified Granuloma Location same=1.
-- **mimic-cxr-findings-baseline**: 70.0% clusters same label in all 5 seeds (size-weighted 64.9%). Lung Lobe Abnormality same=1; Calcified Granuloma Location same=1.
+| Model | Mode | % same label (all) | % same excl low_n | median Δ SD | max Δ SD | # low_n clusters | Jaccard gap GT (same−diff) [CI] |
+|---|---|---:|---:|---:|---:|---:|---|
+| chexpert-mimic-cxr-findings-baseline | all | 85.0% | 85.0% | 0.0165 | 0.0479 | 0 | 0.353 [0.343,0.364] |
+| maira-2 | all | 90.0% | 90.0% | 0.0271 | 0.1177 | 0 | 0.342 [0.331,0.353] |
+| mimic-cxr-findings-baseline | all | 90.0% | 89.5% | 0.0233 | 0.0849 | 1 | 0.345 [0.334,0.356] |
+| chexpert-mimic-cxr-findings-baseline | 1 | 70.0% | 70.6% | 0.0292 | 0.0886 | 3 | 0.269 [0.258,0.280] |
+| maira-2 | 1 | 60.0% | 63.2% | 0.0387 | 0.1660 | 1 | 0.265 [0.253,0.276] |
+| mimic-cxr-findings-baseline | 1 | 90.0% | 87.5% | 0.0357 | 0.0781 | 4 | 0.269 [0.257,0.279] |
 
-## Tracked concepts across seeds
+## Tracked concepts (across-seed mean ± SD; label counts)
 
-- Lung Lobe Abnormality / chexpert-mimic-cxr-findings-baseline: delta mean±SD=-0.3529±0.0479; labels omission/hall/bal=5/0/0
-- Lung Lobe Abnormality / maira-2: delta mean±SD=-0.0364±0.0202; labels omission/hall/bal=0/0/5
-- Lung Lobe Abnormality / mimic-cxr-findings-baseline: delta mean±SD=-0.3302±0.0237; labels omission/hall/bal=5/0/0
-- Calcified Granuloma Location / chexpert-mimic-cxr-findings-baseline: delta mean±SD=0.1090±0.0239; labels omission/hall/bal=0/0/5
-- Calcified Granuloma Location / maira-2: delta mean±SD=-0.0524±0.0248; labels omission/hall/bal=0/0/5
-- Calcified Granuloma Location / mimic-cxr-findings-baseline: delta mean±SD=-0.8548±0.0394; labels omission/hall/bal=0/0/5
+### mode=all
+- **Lung Lobe Abnormality** / chexpert-mimic-cxr-findings-baseline: delta=-0.3529±0.0479; labels omission/hall/bal=5.0/0.0/0.0; low_n=False
+- **Lung Lobe Abnormality** / maira-2: delta=-0.0364±0.0202; labels omission/hall/bal=5.0/0.0/0.0; low_n=False
+- **Lung Lobe Abnormality** / mimic-cxr-findings-baseline: delta=-0.3302±0.0237; labels omission/hall/bal=5.0/0.0/0.0; low_n=False
+- **Calcified Granuloma Location** / chexpert-mimic-cxr-findings-baseline: delta=0.1090±0.0239; labels omission/hall/bal=0.0/5.0/0.0; low_n=False
+- **Calcified Granuloma Location** / maira-2: delta=-0.0524±0.0248; labels omission/hall/bal=5.0/0.0/0.0; low_n=False
+- **Calcified Granuloma Location** / mimic-cxr-findings-baseline: delta=-0.8548±0.0394; labels omission/hall/bal=5.0/0.0/0.0; low_n=True
 
-## Across-seed SD (delta)
-- range: 0.0026 – 0.1177 (median 0.0241)
-
-## Report-level Jaccard vs reference
-
-- chexpert-mimic-cxr-findings-baseline / gt_reports_as_ref: same-report mean/median/IQR=0.797/0.800/[0.714,0.889]; diff-report mean=0.444
-- chexpert-mimic-cxr-findings-baseline / gen_reports_as_ref: same-report mean/median/IQR=0.776/0.800/[0.667,0.857]; diff-report mean=0.559
-- maira-2 / gt_reports_as_ref: same-report mean/median/IQR=0.790/0.800/[0.700,0.889]; diff-report mean=0.447
-- maira-2 / gen_reports_as_ref: same-report mean/median/IQR=0.729/0.714/[0.600,0.833]; diff-report mean=0.638
-- mimic-cxr-findings-baseline / gt_reports_as_ref: same-report mean/median/IQR=0.792/0.800/[0.700,0.889]; diff-report mean=0.447
-- mimic-cxr-findings-baseline / gen_reports_as_ref: same-report mean/median/IQR=0.742/0.750/[0.625,0.857]; diff-report mean=0.480
+### mode=1
+- **Lung Lobe Abnormality** / chexpert-mimic-cxr-findings-baseline: delta=-0.3129±0.0296; labels omission/hall/bal=5.0/0.0/0.0; low_n=False
+- **Lung Lobe Abnormality** / maira-2: delta=-0.0294±0.0644; labels omission/hall/bal=4.0/1.0/0.0; low_n=False
+- **Lung Lobe Abnormality** / mimic-cxr-findings-baseline: delta=-0.2928±0.0707; labels omission/hall/bal=5.0/0.0/0.0; low_n=False
+- **Calcified Granuloma Location** / chexpert-mimic-cxr-findings-baseline: delta=0.0956±0.0886; labels omission/hall/bal=1.0/4.0/0.0; low_n=True
+- **Calcified Granuloma Location** / maira-2: delta=-0.0521±0.0576; labels omission/hall/bal=4.0/1.0/0.0; low_n=False
+- **Calcified Granuloma Location** / mimic-cxr-findings-baseline: delta=-0.8679±0.0294; labels omission/hall/bal=5.0/0.0/0.0; low_n=True
 
 ## Question overlap
-- Unique Q per eval_seed: {123: 32156, 456: 32333, 789: 34248, 202: 33861, 101: 33265}
-- Intersection all 5 seeds: **9569** / 78708 (expected 9569)
 
-## Unexpected / notes
+- mode=all: intersection **9569** / 78708 (expected 9569); per-seed {'123': 32156, '456': 32333, '789': 34248, '202': 33861, '101': 33265}
+- mode=1: intersection **3331** / 78708 (expected 9569); per-seed {123: 12901, 456: 13933, 789: 14082, 202: 14230, 101: 13945}
 
-- See ../exp4/gate.md for model-seed MCQ nondeterminism (gate c).
+## Figure paths
 
-- **Calcified Granuloma Location / mimic-cxr-findings-baseline:** large negative delta (mean ≈ −0.85) but all 5 seeds labeled balanced because GEN instance counts are tiny (11–18 per seed) → bootstrap CI is NaN under report resampling. Treat label as unreliable; flag via instance_counts (`flag_lt_30_any_seed`).
-- CheXpert and MAIRA on that concept also stay balanced across seeds (CheXpert mean delta ≈ +0.11; MAIRA ≈ −0.05).
-- Lung Lobe Abnormality labels are stable: omission for CheXpert/MIMIC (5/5 seeds), balanced for MAIRA (5/5).
+Under `results/revision_r2/exp5/model_seeds_all/` and `.../model_seed_1/`:
+- `fig4_style_seed{123,456,789,202,101}.png/.pdf`
+- `combined_seed_grid.png`
+- `scatter_mean_with_errorbars.png`
+- `jaccard_boxplot.png`

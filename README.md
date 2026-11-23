@@ -206,33 +206,35 @@ For the full experiment across all models and seeds, see [scripts/iuxray_data/qu
 
 #### Revision analyses (Nature Communications R2): K sensitivity and seed consistency
 
-Purpose: Exp 4 (cluster *K* sensitivity) and Exp 5 (eval-seed consistency) on the **stored 2025 Fig. 4** IU-Xray question-categorization results — no re-embedding.
+Purpose: Exp 4 (cluster *K* sensitivity) and Exp 5 (eval-seed consistency) on the **stored 2025 Fig. 4** IU-Xray question-categorization results — no re-embedding. Dominance labels use the manuscript Fig. 4 rule (omission if GT < GEN; hallucination if GT > GEN). Bootstrap CIs and `low_n` are reported separately and do not change labels.
 
 **Inputs (read-only):**  
-`/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_summarized_results/IU_xray/question_categorization_and_analysis/`  
-(`question_embeddings.pkl`, `combined_mcqa_data.csv`, `clustered_questions_with_names.csv`, `cluster_names.json`, stored agreement CSVs).
+`/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_summarized_results/IU_xray/question_categorization_and_analysis/`
 
-**Outputs:** `results/revision_r2/exp4/` and `results/revision_r2/exp5/` (summaries + figures are committed; large CSVs / `.npy` / per-K assignments are gitignored).
+**Outputs:** `results/revision_r2/exp4/` and `results/revision_r2/exp5/` with `model_seeds_all/` (primary) and `model_seed_1/` subdirectories. Summaries + figures are committed; large CSVs / `.npy` / assignments are gitignored.
 
 ```bash
 # From repo root on a compute node (cpu_short; use -p oermannlab if busy). Never on the login node or sp-0010.
 conda activate rrg-eval-clean
 export OPENBLAS_NUM_THREADS=8 OMP_NUM_THREADS=8 CUDA_VISIBLE_DEVICES=
 
-# Interactive / srun smoke test (--quick = 200 bootstrap resamples)
-srun -p cpu_short -c 8 --mem=64G --time=02:00:00 --pty bash
-bash scripts/iuxray_data/question_categorization_and_analysis/run_cluster_k_sensitivity.sh --quick
-bash scripts/iuxray_data/question_categorization_and_analysis/run_seed_consistency.sh --quick
+# Exp 5 final: launcher runs both --model-seeds all and 1
+srun -p cpu_short -c 8 --mem=64G --time=02:00:00 \
+  bash scripts/iuxray_data/question_categorization_and_analysis/run_seed_consistency.sh --quick
 
-# Full runs (2000 bootstraps; can submit in parallel)
+# Exp 4 (separate)
+srun -p cpu_short -c 8 --mem=64G --time=02:00:00 \
+  bash scripts/iuxray_data/question_categorization_and_analysis/run_cluster_k_sensitivity.sh --quick
+
+# Full runs (2000 bootstraps)
 sbatch scripts/iuxray_data/question_categorization_and_analysis/run_cluster_k_sensitivity.sh
 sbatch scripts/iuxray_data/question_categorization_and_analysis/run_seed_consistency.sh
 
-# Later: name non-20 clusters via Llama (requires a working 70B endpoint); does not recompute scores
+# Later (optional): name non-20 clusters via Llama — does not recompute scores
 bash scripts/iuxray_data/question_categorization_and_analysis/run_cluster_k_sensitivity.sh --name
 ```
 
-Tracked concept names in figures/tables: **Lung Lobe Abnormality**, **Calcified Granuloma Location**. Cluster IDs are internal keys / point labels only.
+Tracked concept names: **Lung Lobe Abnormality**, **Calcified Granuloma Location**. Cluster IDs are internal keys / point labels until names exist (K=20 uses stored names).
 
 
 ---

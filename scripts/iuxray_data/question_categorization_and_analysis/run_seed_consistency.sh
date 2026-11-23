@@ -9,11 +9,11 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=rd3571@nyu.edu
 #
+# Runs BOTH model-seed modes (all, then 1). Extra args (e.g. --quick) are forwarded.
 # Works with sbatch (from repo root) or bash inside srun. Never GPUs / login / sp-0010.
 
 set -eo pipefail
 
-# Slurm may copy the script to a spool dir; prefer submit directory.
 if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
   ORIG_DIR="$SLURM_SUBMIT_DIR"
 else
@@ -43,4 +43,9 @@ export CUDA_VISIBLE_DEVICES=
 
 echo "Host=$(hostname) pwd=$(pwd) python=$PY_BIN submit=${SLURM_SUBMIT_DIR:-none}"
 "$PY_BIN" -c "import sklearn; print('sklearn', sklearn.__version__)"
-"$PY_BIN" src/question_categorization_and_analysis/seed_consistency.py "$@"
+
+echo "=== Exp 5 mode=all (primary) ==="
+"$PY_BIN" src/question_categorization_and_analysis/seed_consistency.py --model-seeds all "$@"
+echo "=== Exp 5 mode=1 ==="
+"$PY_BIN" src/question_categorization_and_analysis/seed_consistency.py --model-seeds 1 "$@"
+echo "Exp 5 both modes done."

@@ -47,3 +47,11 @@ results/revision_r2/**/question_overlap.csv
 results/revision_r2/**/_gate/
 results/revision_r2/**/logs/
 results/revision_r2/**/naming_K*/
+
+# Exp4/5 mode subdirs — keep summaries/figures; ignore large tables/assignments
+results/revision_r2/**/model_seeds_all/**/*.csv
+results/revision_r2/**/model_seed_1/**/*.csv
+results/revision_r2/**/model_seeds_all/**/*.npy
+results/revision_r2/**/model_seed_1/**/*.npy
+results/revision_r2/**/model_seeds_all/**/clustered_questions*.csv
+results/revision_r2/**/model_seed_1/**/clustered_questions*.csv
