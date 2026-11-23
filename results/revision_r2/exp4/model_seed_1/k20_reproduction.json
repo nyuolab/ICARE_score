@@ -1,0 +1,6 @@
+{
+  "ari_vs_stored": 1.0,
+  "exact_label_match": 1.0,
+  "model_seeds": "1",
+  "sklearn_version": "1.3.2"
+}

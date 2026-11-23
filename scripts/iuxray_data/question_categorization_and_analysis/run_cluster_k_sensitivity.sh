@@ -9,11 +9,11 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=rd3571@nyu.edu
 #
+# Runs both --model-seeds all and --model-seeds 1.
 # Works with sbatch (from repo root) or bash inside srun. Never GPUs / login / sp-0010.
 
 set -eo pipefail
 
-# Slurm may copy the script to a spool dir; prefer submit directory.
 if [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
   ORIG_DIR="$SLURM_SUBMIT_DIR"
 else
@@ -43,4 +43,11 @@ export CUDA_VISIBLE_DEVICES=
 
 echo "Host=$(hostname) pwd=$(pwd) python=$PY_BIN submit=${SLURM_SUBMIT_DIR:-none}"
 "$PY_BIN" -c "import sklearn; print('sklearn', sklearn.__version__)"
-"$PY_BIN" src/question_categorization_and_analysis/cluster_k_sensitivity.py "$@"
+
+# Pass through flags like --quick / --name; always run both model-seed modes.
+EXTRA=("$@")
+echo "=== Exp4 model_seeds=all ==="
+"$PY_BIN" src/question_categorization_and_analysis/cluster_k_sensitivity.py --model-seeds all "${EXTRA[@]}"
+echo "=== Exp4 model_seeds=1 ==="
+"$PY_BIN" src/question_categorization_and_analysis/cluster_k_sensitivity.py --model-seeds 1 "${EXTRA[@]}"
+echo "Exp4 launcher done"

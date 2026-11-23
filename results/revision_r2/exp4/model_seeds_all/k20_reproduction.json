@@ -1,0 +1,11 @@
+{
+  "ari_vs_stored": 1.0,
+  "exact_label_match": 1.0,
+  "model_seeds": "all",
+  "sklearn_version": "1.3.2",
+  "mode": "all",
+  "max_abs_diff_gt": 1.1102230246251565e-16,
+  "max_abs_diff_gen": 1.1102230246251565e-16,
+  "max_abs_diff_gt_calc_agreement": 1.1102230246251565e-16,
+  "max_abs_diff_gen_calc_agreement": 1.1102230246251565e-16
+}

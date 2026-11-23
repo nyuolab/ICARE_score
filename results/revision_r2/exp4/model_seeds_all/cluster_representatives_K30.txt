@@ -1,0 +1,240 @@
+=== Cluster 0 (3296 questions) ===
+
+1. Does the report mention the condition of the osseous structures?
+2. What can be said about the condition of the osseous structures in the report?
+3. What does the report indicate about the condition of the osseous structures?
+4. What is the condition of the osseous structures as mentioned in the report?
+5. What condition is demonstrated by the osseous structures according to the report?
+
+=== Cluster 1 (2289 questions) ===
+
+1. Are there any focal airspace diseases noted in the lungs according to the report?
+2. Are there any focal airspace opacities present in the lungs according to the report?
+3. Are there any focal airspace diseases present in the lungs according to the report?
+4. Is there a mention of any focal airspace opacity in the lungs?
+5. Can focal airspace disease in the lungs be present according to the report?
+
+=== Cluster 2 (1122 questions) ===
+
+1. What is the finding that represents atelectasis?
+2. Which part of the lungs shows atelectasis?
+3. Is there any mention of lung atelectasis?
+4. Is atelectasis mentioned in the report as being present in the lower lung?
+5. Where is the atelectasis located in the lungs according to the report?
+
+=== Cluster 3 (2018 questions) ===
+
+1. Which condition is mentioned in the report regarding the aorta?
+2. Are there any notable findings in the aorta?
+3. What condition is mentioned in the report regarding the aorta?
+4. What does the report indicate about the aorta's condition?
+5. What is notable about the condition of the aorta?
+
+=== Cluster 4 (3456 questions) ===
+
+1. Is the heart relevant to the diagnosis mentioned in the report?
+2. Is there any heart condition mentioned in the report?
+3. Are there any notable findings in the heart according to the report?
+4. What is indicated about the condition of the heart in the report?
+5. Are there any heart conditions mentioned in the report?
+
+=== Cluster 5 (4057 questions) ===
+
+1. Does the report indicate pneumothorax as a finding?
+2. Can a pneumothorax be present according to the report?
+3. Does the report mention the presence or absence of pleural effusion and pneumothorax?
+4. Can pneumothorax be present according to the report?
+5. Does the report mention pneumothorax as a diagnosis?
+
+=== Cluster 6 (6602 questions) ===
+
+1. Can pleural effusions be present without being mentioned in the report?
+2. Can pleural effusion be present according to the report?
+3. What does the report indicate about the presence of a pleural effusion?
+4. What does the report indicate about the presence of pleural effusions?
+5. Are there any pleural effusions present according to the report?
+
+=== Cluster 7 (1873 questions) ===
+
+1. Is there any mention of the left hemidiaphragm being elevated in the radiology report?
+2. Is there any mention of the left hemidiaphragm's condition in the radiology report?
+3. Is there any mention of an abnormality in the left hemidiaphragm in the radiology report?
+4. Is there any mention of a diaphragmatic hernia in the radiology report?
+5. Is there any mention of a previous condition of the left hemidiaphragm?
+
+=== Cluster 8 (3607 questions) ===
+
+1. Does the report mention any condition affecting the thoracic spine, specifically?
+2. Does the report mention any condition affecting the thoracic spine?
+3. Are there any signs of thoracic spine disease mentioned in the report?
+4. Are degenerative changes noted in any part of the spine other than the thoracic region?
+5. Are there any notable findings in the spine?
+
+=== Cluster 9 (3031 questions) ===
+
+1. Does the report mention the heart being normal in size?
+2. Is there any mention of the heart being normal in size in the report?
+3. Is there any mention of heart size being normal in the report?
+4. Does the heart appear normal in size according to the report?
+5. Does the report indicate that the heart is normal in size?
+
+=== Cluster 10 (1877 questions) ===
+
+1. Where are the calcified granulomas specifically located, as stated in the report?
+2. Where is the calcified granuloma found, according to the report?
+3. Where are the calcified granulomas found according to the report?
+4. Where are the calcified granulomas specifically mentioned to be located?
+5. Where are calcified granulomas found, according to the report?
+
+=== Cluster 11 (1636 questions) ===
+
+1. Is there any mention of an abnormality in the pulmonary vasculature?
+2. What does the report indicate about the pulmonary vasculature's condition?
+3. What does the report indicate about the condition of the pulmonary vasculature?
+4. What does the report indicate about the pulmonary vasculature condition?
+5. Does the report mention any abnormality in pulmonary vascularity?
+
+=== Cluster 12 (9101 questions) ===
+
+1. What does the report indicate about the condition of both lungs?
+2. What does the report imply about the overall condition of the lungs?
+3. What does the report suggest about the overall condition of the lungs?
+4. Are the lungs clear of any conditions according to the report?
+5. What is indicated about the condition of the lungs in the report?
+
+=== Cluster 13 (2203 questions) ===
+
+1. What is the nature of the catheter placement mentioned in the report?
+2. What is the nature of the catheter placed as per the report?
+3. Are there any mentions of medical devices other than surgical clips?
+4. Is there any mention of clips in the radiology report and if so, where are they located?
+5. Is there any new catheter placement mentioned?
+
+=== Cluster 14 (2655 questions) ===
+
+1. What is the condition of the lower lobe of the right lung according to the report?
+2. What is the nature of the finding in the left lower lobe of the lung?
+3. What is the appearance of the lungs except for the right upper lobe?
+4. Is there any mention of a right lower lobe abnormality?
+5. What is noted in the right lower lung area?
+
+=== Cluster 15 (1413 questions) ===
+
+1. Are there any lesions, infiltrates, or consolidations mentioned in the report?
+2. Is the presence of infiltrate or consolidation ruled out by the report?
+3. Are there any focal lesions or consolidations mentioned in the report?
+4. Are infiltrates, consolidations, or suspicious lesions mentioned in the radiology report as being present?
+5. Does the report mention the presence or absence of focal consolidation?
+
+=== Cluster 16 (1025 questions) ===
+
+1. Is there any mention of an acute osseous abnormality?
+2. Does the report mention any acute osseous abnormalities?
+3. Is there any mention of acute osseous abnormality?
+4. Does the report mention any acute bone abnormalities?
+5. Is there any mention of acute bone abnormalities being present?
+
+=== Cluster 17 (3052 questions) ===
+
+1. What does the report specifically mention about lung volumes?
+2. What is the condition of the lung volumes as mentioned in the report?
+3. What is the condition of lung volumes as stated in the report?
+4. What is noted about the lung volumes in the report?
+5. What is notable about the lung volumes in the report?
+
+=== Cluster 18 (887 questions) ===
+
+1. What can be said about the condition of the hilar and mediastinal contours?
+2. Is there any mention of an abnormality in the hilar contours?
+3. Is there a mention of any abnormality in the hilar contours?
+4. Can it be concluded from the report that there are no abnormalities in the hilar and mediastinal contours?
+5. Is there any mention of abnormal hilar contours?
+
+=== Cluster 19 (1353 questions) ===
+
+1. Does the report mention any abnormalities in the mediastinal contours?
+2. Does the report mention any abnormality in the mediastinal contours?
+3. Does the report indicate any abnormalities in the mediastinal contours?
+4. Are there any abnormalities in the mediastinal contours according to the report?
+5. Does the report mention any abnormalities in the cardiac and mediastinal contours?
+
+=== Cluster 20 (1098 questions) ===
+
+1. Does the report indicate pulmonary edema as a finding?
+2. What does the report indicate about pulmonary edema findings?
+3. What does the report indicate about the presence of pulmonary edema?
+4. Does the report mention pulmonary edema as a finding?
+5. Is pulmonary edema mentioned as a finding?
+
+=== Cluster 21 (1774 questions) ===
+
+1. Does the report mention the presence of fluid in the lungs or pleural space?
+2. Does the report indicate the presence of fluid in the lungs or pleural space?
+3. How does the report describe the presence of fluid in the lungs or pleural space?
+4. What does the report say about the presence of fluid in the lungs or pleural space?
+5. Does the report mention any fluid accumulation in the pleural space?
+
+=== Cluster 22 (2346 questions) ===
+
+1. Are there any opacities mentioned in the radiology report and if so, where?
+2. In which area are opacities present according to the report?
+3. Where are the opacities primarily located according to the radiology report?
+4. Is the location of the opacities clearly stated in the report?
+5. Where are the opacities most prominent according to the report?
+
+=== Cluster 23 (1302 questions) ===
+
+1. What does the report indicate about the mediastinum?
+2. What does the report indicate about the condition of the mediastinum?
+3. Does the report indicate that the mediastinum is diseased?
+4. Are there any notable findings regarding the mediastinum?
+5. What does the report indicate about the mediastinum's condition?
+
+=== Cluster 24 (4663 questions) ===
+
+1. Are there any other findings mentioned in the report?
+2. Which of the following is NOT mentioned as present in the radiology report?
+3. Are there any findings under "Other" in the report?
+4. Are there other relevant findings in the report aside from the mentioned conditions?
+5. Which of the following conditions is mentioned as a possible finding in the report?
+
+=== Cluster 25 (1922 questions) ===
+
+1. Is there any mention of the cardiac silhouette being smaller than normal?
+2. Are there any abnormalities in the cardiac silhouette according to the report?
+3. Does the report mention any abnormalities in the cardiac silhouette?
+4. Does the report indicate any abnormalities in the cardiac silhouette?
+5. Is there any mention of abnormalities in the cardiac silhouette?
+
+=== Cluster 26 (1308 questions) ===
+
+1. Is there any mention of the lungs being clear and free of abnormalities?
+2. Can it be concluded from the report that the lungs are free of abnormalities?
+3. Does the report indicate that the lungs are free of any abnormalities?
+4. Are the lungs free from any abnormalities aside from the mentioned findings?
+5. Can it be determined from the report that the lungs are free of abnormalities?
+
+=== Cluster 27 (4548 questions) ===
+
+1. Is there a mention of any focal area of opacity in the lungs?
+2. Are there any areas of pulmonary consolidation in the lungs according to the report?
+3. Is there any mention of focal opacities in the lungs?
+4. Are there any signs of focal consolidation in the lungs according to the report?
+5. What can be said about the lung condition regarding the presence of consolidation?
+
+=== Cluster 28 (2288 questions) ===
+
+1. Are there any notable findings in the bony thorax?
+2. Are there notable findings in the bony thorax?
+3. What can be concluded about the overall condition of the chest based on the radiographs?
+4. Is there any mention of bony abnormalities in the chest according to the report?
+5. Are there any notable findings in the bony thorax according to the report?
+
+=== Cluster 29 (906 questions) ===
+
+1. Does the report mention any abnormality in the XXXX XXXX?
+2. Does the report mention any abnormalities in the XXXX XXXX?
+3. Did the report mention any abnormalities in the XXXX?
+4. Does the report mention any abnormalities in the XXXX?
+5. Are there any abnormalities in the XXXX according to the report?
+
