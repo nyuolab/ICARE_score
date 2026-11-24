@@ -22,6 +22,12 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 from scipy.stats import spearmanr
 
+try:
+    from adjustText import adjust_text
+    HAS_ADJUST_TEXT = True
+except ImportError:
+    HAS_ADJUST_TEXT = False
+
 # ---------------------------------------------------------------------------
 # Manuscript model display names (cluster_analysis.py)
 # ---------------------------------------------------------------------------
@@ -141,7 +147,8 @@ def apply_fig4_axes(ax, *, show_xlabel: bool = True, show_ylabel: bool = True,
     ax.set_xlim(*AX_LIM)
     ax.set_ylim(*AX_LIM)
     ax.set_aspect("equal", adjustable="box")
-    ax.grid(True)
+    ax.grid(True, alpha=0.35)
+    apply_spines(ax, style="left_bottom")
     # Fixed major ticks (avoids gutter spill of auto-ticks under equal aspect)
     ticks = [0.2, 0.4, 0.6, 0.8, 1.0]
     ax.set_xticks(ticks)
@@ -181,72 +188,102 @@ def panel_letter_outside(ax, letter: str) -> None:
     )
 
 
-def offset_cluster_labels(ax, xs, ys, labels, fontsize: float = 6.5) -> None:
-    """Short leader-line offsets; simple repulsion so IDs stay readable (no adjustText)."""
+def apply_spines(ax, style: str = "left_bottom") -> None:
+    """Manuscript redraw style: left+bottom only (not cluster_analysis.py full box)."""
+    if style == "full":
+        for s in ax.spines.values():
+            s.set_visible(True)
+    elif style == "none":
+        for s in ax.spines.values():
+            s.set_visible(False)
+    else:  # left_bottom
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(True)
+        ax.spines["bottom"].set_visible(True)
+
+
+def offset_cluster_labels(ax, xs, ys, labels, fontsize: float = 6.5, objects=None) -> None:
+    """Cluster-ID labels with thin leader lines; prefer adjustText to remove overlaps."""
     xs = np.asarray(xs, dtype=float)
     ys = np.asarray(ys, dtype=float)
+    mask = np.isfinite(xs) & np.isfinite(ys)
+    xs, ys = xs[mask], ys[mask]
+    labels = [lab for lab, m in zip(labels, mask) if m]
     n = len(labels)
-    # Initial offsets in points, alternating
-    base = [
-        (5, 5),
-        (-8, 5),
-        (5, -8),
-        (-8, -8),
-        (10, 0),
-        (-10, 0),
-        (0, 10),
-        (0, -10),
-        (8, 8),
-        (-10, 6),
-    ]
-    offsets = [base[i % len(base)] for i in range(n)]
-    # Repel labels that share nearly the same data position
-    for _ in range(40):
-        moved = False
-        for i in range(n):
-            for j in range(i + 1, n):
-                # screen-ish distance using data coords + offset proxy
-                dx = (xs[i] - xs[j]) + (offsets[i][0] - offsets[j][0]) * 0.004
-                dy = (ys[i] - ys[j]) + (offsets[i][1] - offsets[j][1]) * 0.004
-                dist = (dx * dx + dy * dy) ** 0.5
-                if dist < 0.045:
-                    # push apart in offset space
-                    push = 3.0
-                    if abs(dx) + abs(dy) < 1e-9:
-                        ang = (i + j) * 0.7
-                        ux, uy = np.cos(ang), np.sin(ang)
-                    else:
-                        ux, uy = dx / (dist + 1e-9), dy / (dist + 1e-9)
-                    oi = list(offsets[i])
-                    oj = list(offsets[j])
-                    oi[0] += push * ux
-                    oi[1] += push * uy
-                    oj[0] -= push * ux
-                    oj[1] -= push * uy
-                    # clip offset magnitude
-                    for o in (oi, oj):
-                        mag = (o[0] ** 2 + o[1] ** 2) ** 0.5
-                        if mag > 18:
-                            o[0], o[1] = o[0] * 18 / mag, o[1] * 18 / mag
-                    offsets[i], offsets[j] = tuple(oi), tuple(oj)
-                    moved = True
-        if not moved:
-            break
-    for x, y, lab, (ox, oy) in zip(xs, ys, labels, offsets):
-        ax.annotate(
-            str(lab),
-            (x, y),
-            xytext=(ox, oy),
-            textcoords="offset points",
-            fontsize=fontsize,
-            fontweight="bold",
-            ha="center",
-            va="center",
-            color="0.1",
-            arrowprops=dict(arrowstyle="-", color="0.45", lw=0.4, shrinkA=0, shrinkB=1.5),
-            zorder=5,
-            clip_on=False,
+    texts = []
+    for i, (x, y, lab) in enumerate(zip(xs, ys, labels)):
+        ang = 2.0 * np.pi * (i + 0.5) / max(n, 1)
+        texts.append(
+            ax.text(
+                float(x + 0.02 * np.cos(ang)),
+                float(y + 0.02 * np.sin(ang)),
+                str(lab),
+                fontsize=fontsize,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                color="0.1",
+                zorder=5,
+                clip_on=False,
+            )
         )
+    arrow = dict(arrowstyle="-", color="0.35", lw=0.5, alpha=0.9, shrinkA=0, shrinkB=3)
+
+    used_adjust = False
+    if HAS_ADJUST_TEXT and n > 0:
+        try:
+            ax.figure.canvas.draw()
+        except Exception:
+            pass
+        objs = []
+        if objects is not None:
+            objs = list(objects) if isinstance(objects, (list, tuple)) else [objects]
+        try:
+            adjust_text(
+                texts,
+                ax=ax,
+                objects=objs or None,
+                target_x=xs,
+                target_y=ys,
+                force_text=(1.2, 1.5),
+                force_static=(0.6, 0.7),
+                force_explode=(1.3, 1.5),
+                force_pull=(0.02, 0.02),
+                expand=(1.5, 1.7),
+                max_move=(40, 40),
+                ensure_inside_axes=True,
+                arrowprops=arrow,
+                min_arrow_len=4,
+                iter_lim=1000,
+            )
+            used_adjust = True
+        except Exception as exc:
+            print(f"[WARN] adjust_text failed: {exc}")
+            used_adjust = False
+
+    if not used_adjust:
+        for txt in texts:
+            txt.set_visible(False)
+        base = [(9, 9), (-12, 9), (9, -12), (-12, -12), (15, 2), (-15, 2), (2, 15), (2, -15),
+                (12, -6), (-12, 6), (6, 12), (-6, -12)]
+        for i, (x, y, lab) in enumerate(zip(xs, ys, labels)):
+            ox, oy = base[i % len(base)]
+            ax.annotate(
+                str(lab),
+                (x, y),
+                xytext=(ox, oy),
+                textcoords="offset points",
+                fontsize=6.5,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                color="0.1",
+                arrowprops=arrow,
+                zorder=5,
+                clip_on=False,
+            )
+
 
 
 def size_legend_handles(example_counts=(1500, 8000, 25000)):
@@ -348,7 +385,7 @@ def build_supp_fig_a(exp5: Path, names: Dict[int, str], out: Path) -> pd.DataFra
                     "side_of_diagonal": side,
                 }
             )
-        ax.scatter(
+        sc = ax.scatter(
             xs,
             ys,
             s=sizes,
@@ -362,7 +399,7 @@ def build_supp_fig_a(exp5: Path, names: Dict[int, str], out: Path) -> pd.DataFra
         apply_fig4_axes(ax)
         ax.set_title(display(model), fontweight="bold", pad=8)
         panel_letter_outside(ax, letters[i])
-        offset_cluster_labels(ax, xs, ys, labs, fontsize=6.5)
+        offset_cluster_labels(ax, xs, ys, labs, fontsize=6.5, objects=sc)
         if i == 0:
             legend_ax = ax
 
@@ -807,7 +844,11 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                 show_xticklabels=(ri == nrows - 1),
                 show_yticklabels=(ci == 0),
             )
-            offset_cluster_labels(ax, xs, ys, labs, fontsize=5.5 if k >= 25 else 6.0)
+            # label after both scatter layers; pass all PathCollections as avoid objects
+            sc_objs = [c for c in ax.collections]
+            offset_cluster_labels(
+                ax, xs, ys, labs, fontsize=5.5 if k >= 25 else 6.0, objects=sc_objs
+            )
 
             if ri == 0:
                 ax.set_title(display(model), fontweight="bold", pad=6, fontsize=8)
@@ -824,11 +865,9 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
             if ri == 0 and ci == 0:
                 panel_letter_outside(ax, "a")
 
-            # Light band to mark Fig. 4 row
+            # Mark Fig. 4 row without changing spine style
             if k == 20:
-                for spine in ax.spines.values():
-                    spine.set_linewidth(1.4)
-                    spine.set_color("0.15")
+                ax.set_facecolor("#f7f7f7")
 
             for _, r in sub.iterrows():
                 side = side_of_diagonal(r.GT, r.GEN)
@@ -1231,7 +1270,8 @@ def main() -> int:
     print(f"  point size: s = GT_Count / {FIG4_SIZE_DIVISOR:g}")
     print(f"  alpha={FIG4_ALPHA}, edgecolors={FIG4_EDGE!r}, linewidth={FIG4_EDGE_LW}")
     print(f"  diagonal: k--, lw={FIG4_DIAG_LW}, alpha={FIG4_DIAG_ALPHA}")
-    print(f"  grid=True; default spines (full box); axes lim={AX_LIM}")
+    print(f"  grid=True; spines=left+bottom only (revised MS style); axes lim={AX_LIM}")
+    print(f"  adjustText={HAS_ADJUST_TEXT}; label fontsize=6.5 with thin leaders")
     print(f"  model titles from MODEL_DISPLAY_NAMES; fonts bold")
 
     setup_style()
