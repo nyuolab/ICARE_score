@@ -58,8 +58,11 @@ FIG4_DIAG_LW = 1.5
 FIG4_DIAG_ALPHA = 0.7
 AX_LIM = (0.0, 1.0)
 # Per-panel size in the submitted Fig. 4 figure (figsize 24x28, 3 left panels)
-FIG4_PANEL_W = 24 * 1.5 / 2.5  # inches
-FIG4_PANEL_H = 28 / 3.0
+FIG4_FIGSIZE = (24.0, 28.0)  # exact submitted Fig. 4
+FIG4_WIDTH_RATIOS = (1.5, 1.0)
+FIG4_HSPACE = 0.3
+FIG4_PANEL_W = 24.0 * 1.5 / 2.5  # left-column panel width (in)
+FIG4_PANEL_H = 28.0 / 3.0         # left-column panel height (in)
 ERRORBAR_ZORDER = 2
 MARKER_ZORDER = 3
 LABEL_ZORDER = 4
@@ -240,28 +243,40 @@ def size_legend_handles(example_counts):
 
 
 
-def draw_booktabs_key(ax, names: Dict[int, str], fontsize: float = 14) -> None:
-    """ID → Cluster booktabs table filling the panel box."""
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
+def draw_fig4_table(ax, names: Dict[int, str]) -> None:
+    """Exact Fig. 4 (d) table style from cluster_analysis.py."""
     ax.axis("off")
-    n_rows = 20
-    y_top, y_bot = 0.98, 0.02
-    row_h = (y_top - y_bot) / (n_rows + 1)
-    x_id, x_name = 0.10, 0.22
-    y_header = y_top - 0.5 * row_h
-    ax.text(x_id, y_header, "ID", fontsize=fontsize, fontweight="bold", ha="center", va="center")
-    ax.text(x_name, y_header, "Cluster", fontsize=fontsize, fontweight="bold", ha="left", va="center")
-    ax.plot([0.04, 0.96], [y_top, y_top], color="k", lw=1.2, solid_capstyle="butt", clip_on=False)
-    ax.plot([0.04, 0.96], [y_top - row_h, y_top - row_h], color="k", lw=0.9, solid_capstyle="butt", clip_on=False)
-    ax.plot([0.04, 0.96], [y_bot, y_bot], color="k", lw=1.2, solid_capstyle="butt", clip_on=False)
-    for i in range(20):
-        y = y_top - (i + 1.5) * row_h
-        ax.text(x_id, y, str(i), fontsize=fontsize, fontweight="bold", ha="center", va="center")
-        nm = names.get(i, "")
-        if len(nm) > 42:
-            nm = nm[:39] + "..."
-        ax.text(x_name, y, nm, fontsize=fontsize, fontweight="bold", ha="left", va="center")
+    ax.text(-0.15, 1.0, "(d)", fontsize=30, fontweight="bold")
+    table_data = [[str(i), names.get(i, "")] for i in range(20)]
+    table = ax.table(
+        cellText=table_data,
+        colLabels=["ID", "Cluster Name"],
+        loc="center",
+        cellLoc="left",
+        bbox=[0.02, 0.02, 1.3, 0.98],
+        colWidths=[0.24, 0.76],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(24)
+    table.scale(1.2, 1.8)
+    for (row, col), cell in table.get_celld().items():
+        if row == 0:
+            cell.set_text_props(weight="bold", fontsize=24)
+            cell.set_facecolor("#E6E6E6")
+            cell._text.set_horizontalalignment("center")
+            if col == 0:
+                cell.get_text().set_text("Cluster ID")
+        else:
+            cell.set_text_props(weight="bold", fontsize=22)
+            if col == 0:
+                cell._text.set_horizontalalignment("center")
+            else:
+                cell._text.set_horizontalalignment("left")
+                cell.get_text().set_wrap(True)
+                cur = cell.get_text().get_text()
+                if len(cur) > 50:
+                    cell.get_text().set_text(cur[:47] + "...")
+        cell.PAD = 0.1
 
 
 def scatter_fig4(ax, xs, ys, counts, colors):
@@ -293,33 +308,31 @@ def pooled_n_gt_exp5(exp5: Path) -> pd.DataFrame:
 
 
 def build_supp_fig_a(exp5: Path, names: Dict[int, str], out: Path) -> pd.DataFrame:
-    """2x2 at Fig. 4 panel size/style; colours + SD error bars only differences."""
+    """Fig. 4 layout (3 stacked left + spanning table); colours + SD error bars only."""
     summ = pd.read_csv(exp5 / "model_seeds_all" / "across_seed_summary.csv")
     pooled = pooled_n_gt_exp5(exp5)
     summ = summ.merge(pooled, on=["Model", "Cluster"], how="left")
-    counts_all = summ.pooled_n_gt.fillna(summ.mean_n_gt).to_numpy(dtype=float)
-    ex_counts = (
-        max(int(np.nanpercentile(counts_all, 20)), 1),
-        max(int(np.nanpercentile(counts_all, 50)), 1),
-        max(int(np.nanpercentile(counts_all, 80)), 1),
-    )
 
-    # Two-by-two panels each ~ Fig. 4 left-panel size
-    fig_w = 2.05 * FIG4_PANEL_W
-    fig_h = 2.05 * FIG4_PANEL_H + 1.2  # legend strip
-    fig = plt.figure(figsize=(fig_w, fig_h))
+    # Exact Fig. 4 figure size + GridSpec; thin bottom strip for one-line legend
+    fig = plt.figure(figsize=(FIG4_FIGSIZE[0], FIG4_FIGSIZE[1] + 0.9))
     gs = GridSpec(
-        3, 2, figure=fig,
-        height_ratios=[1.0, 1.0, 0.18],
-        hspace=0.30, wspace=0.22,
-        left=0.07, right=0.98, top=0.94, bottom=0.08,
+        4,
+        2,
+        figure=fig,
+        width_ratios=list(FIG4_WIDTH_RATIOS),
+        height_ratios=[1, 1, 1, 0.08],
+        hspace=FIG4_HSPACE,
+        wspace=0.15,
+        left=0.08,
+        right=0.92,
+        top=0.96,
+        bottom=0.04,
     )
     letters = ["a", "b", "c"]
-    positions = [(0, 0), (0, 1), (1, 0)]
     source_rows = []
 
-    for i, model in enumerate(MODEL_ORDER):
-        ax = fig.add_subplot(gs[positions[i][0], positions[i][1]])
+    for idx, model in enumerate(MODEL_ORDER):
+        ax = fig.add_subplot(gs[idx, 0])
         sub = summ[summ.Model == model].copy()
         xs = sub.GEN_mean.to_numpy(dtype=float)
         ys = sub.GT_mean.to_numpy(dtype=float)
@@ -327,17 +340,23 @@ def build_supp_fig_a(exp5: Path, names: Dict[int, str], out: Path) -> pd.DataFra
         cnt = sub.pooled_n_gt.fillna(sub.mean_n_gt).to_numpy(dtype=float)
         colors = [side_color(side_of_diagonal(g, e)) for g, e in zip(ys, xs)]
 
-        # Error bars beneath markers
         for _, r in sub.iterrows():
             side = side_of_diagonal(r.GT_mean, r.GEN_mean)
             ax.errorbar(
-                r.GEN_mean, r.GT_mean, xerr=r.GEN_sd, yerr=r.GT_sd,
-                fmt="none", ecolor=side_color(side), elinewidth=1.0,
-                capsize=2.0, alpha=0.85, zorder=ERRORBAR_ZORDER,
+                r.GEN_mean,
+                r.GT_mean,
+                xerr=r.GEN_sd,
+                yerr=r.GT_sd,
+                fmt="none",
+                ecolor=side_color(side),
+                elinewidth=0.8,
+                capsize=1.2,
+                alpha=0.85,
+                zorder=ERRORBAR_ZORDER,
             )
             source_rows.append(
                 {
-                    "panel": letters[i],
+                    "panel": letters[idx],
                     "model": display(model),
                     "cluster_id": int(r.Cluster),
                     "cluster_name": names.get(int(r.Cluster), r.cluster_name),
@@ -348,7 +367,9 @@ def build_supp_fig_a(exp5: Path, names: Dict[int, str], out: Path) -> pd.DataFra
                     "pooled_n_gt": float(r.pooled_n_gt) if pd.notna(r.pooled_n_gt) else float(r.mean_n_gt),
                     "side_of_diagonal": side,
                     "marker_size_pt2": float(
-                        fig4_point_sizes([r.pooled_n_gt if pd.notna(r.pooled_n_gt) else r.mean_n_gt])[0]
+                        fig4_point_sizes(
+                            [r.pooled_n_gt if pd.notna(r.pooled_n_gt) else r.mean_n_gt]
+                        )[0]
                     ),
                 }
             )
@@ -358,29 +379,30 @@ def build_supp_fig_a(exp5: Path, names: Dict[int, str], out: Path) -> pd.DataFra
         draw_fig4_diagonal(ax)
         style_fig4_axes(ax)
         ax.set_title(display(model), fontsize=24, weight="bold", pad=20)
-        panel_letter_fig4(ax, letters[i])
+        panel_letter_fig4(ax, letters[idx])
         add_correlation_box(ax, xs, ys)
 
-    axd = fig.add_subplot(gs[1, 1])
-    panel_letter_fig4(axd, "d")
-    draw_booktabs_key(axd, names, fontsize=14)
+    ax_table = fig.add_subplot(gs[0:3, 1])
+    draw_fig4_table(ax_table, names)
 
-    handles = colour_legend_handles() + size_legend_handles(ex_counts)
-    err_proxy = Line2D([0], [0], color="0.3", lw=1.2, label="Error bars: SD across 5 evaluation seeds")
-    fig.legend(
-        handles=handles + [err_proxy],
-        loc="lower center",
-        bbox_to_anchor=(0.5, 0.005),
-        ncol=6,
-        frameon=True,
-        fontsize=14,
-        handletextpad=0.4,
-        columnspacing=1.0,
-        borderpad=0.4,
-        title="Colour = side of diagonal; point size = pooled GT question count / 30 (Fig. 4)",
-        title_fontsize=14,
+    leg_ax = fig.add_subplot(gs[3, :])
+    leg_ax.axis("off")
+    err_proxy = Line2D(
+        [0], [0], color="0.25", lw=1.0, label="Error bars: SD across 5 evaluation seeds"
     )
-    print(f"Supp Fig A axes={len(fig.axes)} figsize={fig.get_size_inches()}")
+    leg_ax.legend(
+        handles=colour_legend_handles() + [err_proxy],
+        loc="center",
+        ncol=3,
+        frameon=False,
+        fontsize=16,
+        handletextpad=0.5,
+        columnspacing=1.5,
+    )
+    print(
+        f"Supp Fig A axes={len(fig.axes)} figsize={fig.get_size_inches()} "
+        f"panel~{FIG4_PANEL_W:.2f}x{FIG4_PANEL_H:.2f}in"
+    )
     save_fig(fig, out / "SuppFigA_exp5_seed_consistency")
     return pd.DataFrame(source_rows)
 
@@ -707,41 +729,34 @@ def concept_cluster_ids(exp4: Path) -> Dict[int, Dict[str, int]]:
 
 
 def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str], out: Path) -> Dict[str, pd.DataFrame]:
-    """5x3 grid; each panel uses Fig. 4 scatter style; K=20 row shaded."""
+    """5x3 grid; each panel uses Fig. 4 panel size and scatter style."""
     concept_ids = concept_cluster_ids(exp4)
     scores_by_k = {k: load_scores(exp4, k) for k in KS_GRID}
-    all_counts = np.concatenate([scores_by_k[k].n_gt.to_numpy(dtype=float) for k in KS_GRID])
-    ex_counts = (
-        max(int(np.nanpercentile(all_counts, 20)), 1),
-        max(int(np.nanpercentile(all_counts, 50)), 1),
-        max(int(np.nanpercentile(all_counts, 80)), 1),
-    )
 
     nrows, ncols = len(KS_GRID), len(MODEL_ORDER)
-    fig_w = ncols * FIG4_PANEL_W * 0.55  # fit page width while keeping style
-    fig_h = nrows * FIG4_PANEL_H * 0.55 + 1.0
-    # Keep absolute fonts of Fig. 4; scale figure so panels remain readable
-    # Prefer Fig. 4 panel inch size when printable:
-    fig_w = ncols * 8.0
-    fig_h = nrows * 7.5 + 1.2
+    fig_w = ncols * FIG4_PANEL_W
+    fig_h = nrows * FIG4_PANEL_H + 1.0
     fig = plt.figure(figsize=(fig_w, fig_h))
     gs = GridSpec(
-        nrows, ncols, figure=fig,
-        hspace=0.28, wspace=0.18,
-        left=0.06, right=0.99, top=0.93, bottom=0.04,
+        nrows,
+        ncols,
+        figure=fig,
+        hspace=FIG4_HSPACE,
+        wspace=0.18,
+        left=0.05,
+        right=0.99,
+        top=0.95,
+        bottom=0.03,
     )
-    handles = colour_legend_handles() + size_legend_handles(ex_counts)
     fig.legend(
-        handles=handles,
+        handles=colour_legend_handles(),
         loc="upper center",
         bbox_to_anchor=(0.5, 0.995),
-        ncol=5,
+        ncol=2,
         frameon=True,
-        fontsize=14,
-        handletextpad=0.4,
-        columnspacing=1.0,
-        title="Colour = side of diagonal; point size = GT question count / 30 (Fig. 4)",
-        title_fontsize=14,
+        fontsize=16,
+        handletextpad=0.5,
+        columnspacing=1.5,
     )
     source_d = []
 
@@ -766,16 +781,24 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                 show_ylabel=(ci == 0),
                 show_xticklabels=(ri == nrows - 1),
                 show_yticklabels=(ci == 0),
-                xlabel_fontsize=18,
-                ylabel_fontsize=18,
             )
             if ri == 0:
-                ax.set_title(display(model), fontsize=22, weight="bold", pad=12)
+                ax.set_title(display(model), fontsize=24, weight="bold", pad=20)
             if ci == 0:
                 if k == 20:
-                    ax.set_ylabel(f"K = {k} (Fig. 4)\nICARE-GT", fontsize=18, weight="bold", labelpad=10)
+                    ax.set_ylabel(
+                        f"K = {k} (Fig. 4)\nICARE-GT",
+                        fontsize=22,
+                        weight="bold",
+                        labelpad=15,
+                    )
                 else:
-                    ax.set_ylabel(f"K = {k}\nICARE-GT", fontsize=18, weight="bold", labelpad=10)
+                    ax.set_ylabel(
+                        f"K = {k}\nICARE-GT",
+                        fontsize=22,
+                        weight="bold",
+                        labelpad=15,
+                    )
             if k == 20:
                 ax.set_facecolor("#eeeeee")
             if ri == 0 and ci == 0:
@@ -797,13 +820,20 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                         "side_of_diagonal": side,
                         "marker_size_pt2": float(fig4_point_sizes([r.n_gt])[0]),
                         "highlight_concept": next(
-                            (c for c, cid in concept_ids.get(k, {}).items() if cid == int(r.Cluster)),
+                            (
+                                c
+                                for c, cid in concept_ids.get(k, {}).items()
+                                if cid == int(r.Cluster)
+                            ),
                             "",
                         ),
                     }
                 )
 
-    print(f"Supp Fig B axes={len(fig.axes)} (expect {nrows*ncols}) figsize={fig.get_size_inches()}")
+    print(
+        f"Supp Fig B axes={len(fig.axes)} (expect {nrows * ncols}) "
+        f"figsize={fig.get_size_inches()} panel={FIG4_PANEL_W:.2f}x{FIG4_PANEL_H:.2f}in"
+    )
     if len(fig.axes) != nrows * ncols:
         print(f"[WARN] unexpected axes count {len(fig.axes)}")
     save_fig(fig, out / "SuppFigB_exp4_k_sensitivity")
