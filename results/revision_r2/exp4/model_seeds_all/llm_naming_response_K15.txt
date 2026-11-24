@@ -1,0 +1,19 @@
+Here are the category names for each cluster:
+
+Category for Cluster 1: Hemidiaphragm Abnormalities
+Category for Cluster 2: Heart Size Normality
+Category for Cluster 3: Pneumothorax Presence
+Category for Cluster 4: Lung Volume Condition
+Category for Cluster 5: Additional Radiology Findings
+Category for Cluster 6: Overall Lung Condition
+Category for Cluster 7: Focal Lung Opacities
+Category for Cluster 8: Thoracic Spine Conditions
+Category for Cluster 9: Cardiac Silhouette Abnormalities
+Category for Cluster 10: Lower Lobe Lung Abnormalities
+Category for Cluster 11: Pleural Effusion Presence
+Category for Cluster 12: Cardiac and Mediastinal Contours
+Category for Cluster 13: Osseous Structure Condition
+Category for Cluster 14: Calcified Granuloma Location
+Category for Cluster 15: Aortic Conditions
+
+These category names aim to capture the common theme and medical findings in each cluster, using specific and accurate medical terminology.

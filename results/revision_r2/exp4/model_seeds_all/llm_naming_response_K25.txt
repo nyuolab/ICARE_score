@@ -1,0 +1,29 @@
+Here are the category names for each cluster:
+
+Category for Cluster 1: Lung Condition Assessment
+Category for Cluster 2: Thoracic Spine Condition
+Category for Cluster 3: Catheter Placement Status
+Category for Cluster 4: Additional Radiology Findings
+Category for Cluster 5: Calcified Granuloma Location
+Category for Cluster 6: Heart Size Normalcy
+Category for Cluster 7: Left Hemidiaphragm Condition
+Category for Cluster 8: Lung Clear of Abnormalities
+Category for Cluster 9: Aortic Condition
+Category for Cluster 10: Pleural Fluid Presence
+Category for Cluster 11: Pulmonary Edema Findings
+Category for Cluster 12: Opacity Location and Nature
+Category for Cluster 13: Pneumothorax Diagnosis
+Category for Cluster 14: Heart Condition Mention
+Category for Cluster 15: Lung Lobe Abnormalities
+Category for Cluster 16: Acute Bony Abnormalities
+Category for Cluster 17: Lung Volume Condition
+Category for Cluster 18: Atelectasis Location
+Category for Cluster 19: Lung Lesions or Consolidations
+Category for Cluster 20: Cardiac and Mediastinal Contours
+Category for Cluster 21: Pleural Effusion Presence
+Category for Cluster 22: Osseous Structure Condition
+Category for Cluster 23: Focal Airspace Opacity
+Category for Cluster 24: Hiatal Hernia Size
+Category for Cluster 25: Cardiac Silhouette Abnormalities
+
+These category names aim to capture the common theme and medical terminology used in each cluster, while being concise and distinct from one another.

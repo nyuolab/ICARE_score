@@ -28,3 +28,5 @@ Part 1: for each K and model, counts and percentages of clusters below / above t
 ## Supp Table C
 **Supplementary Table C. Cluster keys for K = 10, 15, 25, 30.**  
 Cluster ID → best-matching K=20 cluster name and share. The K=20 name key is Fig. 4d.
+
+Cluster names for K ≠ 20 were generated with Llama 3.3 70B using the same prompt and nearest-centroid representatives as Fig. 4; K = 20 names are those of Fig. 4.

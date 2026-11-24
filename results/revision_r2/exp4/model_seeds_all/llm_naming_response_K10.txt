@@ -1,0 +1,14 @@
+Here are the generated category names for each cluster:
+
+Category for Cluster 1: Aortic Condition Findings
+Category for Cluster 2: Lung Condition Assessment
+Category for Cluster 3: Pneumothorax Diagnosis
+Category for Cluster 4: Osseous Abnormalities
+Category for Cluster 5: Cardiac Mediastinal Contours
+Category for Cluster 6: Right Lung Lobe Abnormalities
+Category for Cluster 7: Cardiac Enlargement Findings
+Category for Cluster 8: Focal Lung Opacities
+Category for Cluster 9: Pleural Effusion Presence
+Category for Cluster 10: Thoracic Spine Conditions
+
+These category names aim to capture the common theme of each cluster, using specific medical terminology and being concise enough to be meaningful while distinct from other cluster names.
