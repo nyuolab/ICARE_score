@@ -213,6 +213,8 @@ Purpose: Exp 4 (cluster *K* sensitivity) and Exp 5 (eval-seed consistency) on th
 
 **Outputs:** `results/revision_r2/exp4/` and `results/revision_r2/exp5/` with `model_seeds_all/` (primary) and `model_seed_1/` subdirectories. Summaries + figures are committed; large CSVs / `.npy` / assignments are gitignored.
 
+**Final supplement (from existing outputs only):** `python src/question_categorization_and_analysis/make_r2_supp_figures.py` → `results/revision_r2/final/` (Supp Fig. A–B, Tables A–C, Source Data, captions).
+
 ```bash
 # From repo root on a compute node (cpu_short; use -p oermannlab if busy). Never on the login node or sp-0010.
 conda activate rrg-eval-clean

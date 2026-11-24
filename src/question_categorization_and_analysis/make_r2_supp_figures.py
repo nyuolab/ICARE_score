@@ -1,0 +1,1061 @@
+#!/usr/bin/env python3
+"""Final R2 supplementary figures/tables/Source Data for Exp 4 & 5 (model_seeds_all only).
+
+Reads existing results/revision_r2/exp{4,5}/model_seeds_all/ outputs.
+Does not recompute scores, re-cluster, or call LLMs for naming.
+Re-runnable: picks up cluster_names_K{K}.json when present.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
+from scipy.stats import spearmanr
+
+# ---------------------------------------------------------------------------
+# Manuscript model display names (cluster_analysis.py)
+# ---------------------------------------------------------------------------
+MODEL_DISPLAY_NAMES = {
+    "mimic-cxr-findings-baseline": "CheXpertPlus_MIMIC",
+    "chexpert-mimic-cxr-findings-baseline": "CheXpertPlus_Chex_MIMIC",
+    "maira-2": "MAIRA2",
+}
+MODEL_ORDER = [
+    "mimic-cxr-findings-baseline",
+    "chexpert-mimic-cxr-findings-baseline",
+    "maira-2",
+]
+
+# Fig. 4 side-of-diagonal colours (colour-blind safer red/blue)
+COLOR_BELOW = "#d62728"  # omission-dominated: ICARE-GT < ICARE-GEN
+COLOR_ABOVE = "#1f77b4"  # hallucination-dominated: ICARE-GT > ICARE-GEN
+COLOR_ON = "#7f7f7f"     # on diagonal
+
+KS = [10, 15, 20, 25, 30]
+KS_GRID = [10, 15, 25, 30]
+MM = 1 / 25.4
+FIG_W = 180 * MM  # double-column
+
+
+def _tex(s) -> str:
+    return str(s).replace('_', r'\_')
+
+
+def side_of_diagonal(gt: float, gen: float) -> str:
+    if not (np.isfinite(gt) and np.isfinite(gen)):
+        return "undefined"
+    if gt < gen:
+        return "below"
+    if gt > gen:
+        return "above"
+    return "on"
+
+
+def side_color(side: str) -> str:
+    return {"below": COLOR_BELOW, "above": COLOR_ABOVE, "on": COLOR_ON}.get(side, COLOR_ON)
+
+
+def display(model: str) -> str:
+    return MODEL_DISPLAY_NAMES.get(model, model)
+
+
+def load_names(exp4: Path, k: int) -> Dict[int, str]:
+    """Load cluster_names_K{k}.json if present (K=20 always; others when named)."""
+    for base in (exp4 / "model_seeds_all", exp4):
+        p = base / f"cluster_names_K{k}.json"
+        if p.is_file():
+            raw = json.loads(p.read_text())
+            return {int(k_): str(v) for k_, v in raw.items()}
+    return {}
+
+
+def wilson_ci(p: float, n: int, z: float = 1.96) -> Tuple[float, float]:
+    """Binomial Wilson 95% CI from existing rate + count (no rerun)."""
+    if n <= 0 or not np.isfinite(p):
+        return float("nan"), float("nan")
+    p = float(np.clip(p, 0.0, 1.0))
+    z2 = z * z
+    den = 1.0 + z2 / n
+    centre = (p + z2 / (2 * n)) / den
+    half = (z / den) * math.sqrt(p * (1 - p) / n + z2 / (4 * n * n))
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def setup_style() -> None:
+    mpl.rcParams.update(
+        {
+            "font.size": 8,
+            "axes.labelsize": 8,
+            "axes.titlesize": 8,
+            "xtick.labelsize": 7,
+            "ytick.labelsize": 7,
+            "legend.fontsize": 7,
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "axes.linewidth": 0.8,
+            "figure.dpi": 150,
+            "savefig.dpi": 300,
+            "savefig.bbox": "tight",
+            "savefig.pad_inches": 0.02,
+        }
+    )
+
+
+def save_fig(fig: plt.Figure, stem: Path) -> None:
+    stem.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(stem.with_suffix(".pdf"))
+    fig.savefig(stem.with_suffix(".png"), dpi=300)
+    plt.close(fig)
+    print(f"Wrote {stem.with_suffix('.pdf')} and .png")
+
+
+def panel_letter(ax, letter: str, x: float = -0.12, y: float = 1.05) -> None:
+    ax.text(x, y, letter, transform=ax.transAxes, fontsize=10, fontweight="bold", va="top", ha="right")
+
+
+def legend_side_size(ax, size_handles: Optional[List] = None, loc: str = "lower right") -> None:
+    handles = [
+        Patch(facecolor=COLOR_BELOW, edgecolor="none", label="Below diagonal (ICARE-GT < ICARE-GEN)"),
+        Patch(facecolor=COLOR_ABOVE, edgecolor="none", label="Above diagonal (ICARE-GT > ICARE-GEN)"),
+    ]
+    if size_handles:
+        handles = handles + size_handles
+    ax.legend(handles=handles, loc=loc, frameon=True, framealpha=0.9, fontsize=6)
+
+
+# ========================= Exp 5 / Supp Fig A & Table A =========================
+
+def build_supp_fig_a(exp5: Path, names: Dict[int, str], out: Path) -> pd.DataFrame:
+    summ = pd.read_csv(exp5 / "model_seeds_all" / "across_seed_summary.csv")
+    fig = plt.figure(figsize=(FIG_W, FIG_W * 0.95))
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.15, 1], height_ratios=[1, 1], wspace=0.32, hspace=0.28)
+    # (a)(b) top; (c) bottom-left; (d) key bottom-right
+    axes_pos = [(0, 0), (0, 1), (1, 0)]
+    letters = ["a", "b", "c"]
+    source_rows = []
+
+    for i, model in enumerate(MODEL_ORDER):
+        ax = fig.add_subplot(gs[axes_pos[i][0], axes_pos[i][1]])
+        sub = summ[summ.Model == model].copy()
+        nmax = max(sub.mean_n_gt.max(), 1.0)
+        for _, r in sub.iterrows():
+            side = side_of_diagonal(r.GT_mean, r.GEN_mean)
+            s = 18 + 90 * (float(r.mean_n_gt) / nmax)
+            ax.errorbar(
+                r.GEN_mean,
+                r.GT_mean,
+                xerr=r.GEN_sd,
+                yerr=r.GT_sd,
+                fmt="none",
+                ecolor=side_color(side),
+                elinewidth=0.6,
+                capsize=1.2,
+                alpha=0.7,
+                zorder=2,
+            )
+            ax.scatter(
+                r.GEN_mean,
+                r.GT_mean,
+                s=s,
+                c=side_color(side),
+                alpha=0.85,
+                edgecolors="black",
+                linewidths=0.3,
+                zorder=3,
+            )
+            ax.annotate(
+                str(int(r.Cluster)),
+                (r.GEN_mean, r.GT_mean),
+                xytext=(2, 2),
+                textcoords="offset points",
+                fontsize=6,
+                ha="left",
+                va="bottom",
+            )
+            source_rows.append(
+                {
+                    "panel": letters[i],
+                    "model": display(model),
+                    "cluster_id": int(r.Cluster),
+                    "cluster_name": names.get(int(r.Cluster), r.cluster_name),
+                    "ICARE_GEN_mean": r.GEN_mean,
+                    "ICARE_GEN_sd": r.GEN_sd,
+                    "ICARE_GT_mean": r.GT_mean,
+                    "ICARE_GT_sd": r.GT_sd,
+                    "mean_n_gt": r.mean_n_gt,
+                    "mean_n_gen": r.mean_n_gen,
+                    "side_of_diagonal": side,
+                }
+            )
+        ax.plot([0, 1], [0, 1], "k--", lw=0.8, alpha=0.7, zorder=1)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_xlabel("ICARE-GEN")
+        ax.set_ylabel("ICARE-GT")
+        ax.set_aspect("equal", adjustable="box")
+        ax.grid(True, alpha=0.25, lw=0.4)
+        # model name as axis annotation (not an internal title)
+        ax.text(0.03, 0.97, display(model), transform=ax.transAxes, fontsize=7, fontweight="bold", va="top")
+        panel_letter(ax, f"({letters[i]})")
+        if i == 0:
+            size_handles = [
+                Line2D([0], [0], marker="o", color="w", markerfacecolor="0.4", markersize=4, label="Fewer questions"),
+                Line2D([0], [0], marker="o", color="w", markerfacecolor="0.4", markersize=9, label="More questions"),
+            ]
+            legend_side_size(ax, size_handles, loc="lower right")
+
+    # (d) key panel
+    axd = fig.add_subplot(gs[1, 1])
+    axd.axis("off")
+    panel_letter(axd, "(d)", x=0.02, y=1.02)
+    rows = [[str(cid), names.get(cid, "")] for cid in range(20)]
+    table = axd.table(
+        cellText=rows,
+        colLabels=["ID", "Cluster name"],
+        loc="center",
+        cellLoc="left",
+        bbox=[0.0, 0.0, 1.0, 0.98],
+        colWidths=[0.12, 0.88],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(6)
+    table.scale(1.0, 1.15)
+    for (row, col), cell in table.get_celld().items():
+        if row == 0:
+            cell.set_facecolor("#E6E6E6")
+            cell.set_text_props(weight="bold", fontsize=6)
+        if col == 0:
+            cell.get_text().set_ha("center")
+
+    save_fig(fig, out / "SuppFigA_exp5_seed_consistency")
+    return pd.DataFrame(source_rows)
+
+
+def build_supp_table_a(exp5: Path, names: Dict[int, str], out: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    summ = pd.read_csv(exp5 / "model_seeds_all" / "across_seed_summary.csv")
+    lab = pd.read_csv(exp5 / "model_seeds_all" / "label_consistency.csv")
+    jac_sum = pd.read_csv(exp5 / "model_seeds_all" / "report_jaccard_summary.csv")
+    jac = pd.read_csv(exp5 / "model_seeds_all" / "report_jaccard.csv")
+    meta_path = exp5 / "model_seeds_all" / "mode_meta.json"
+    meta = json.loads(meta_path.read_text()) if meta_path.is_file() else {}
+
+    rows = []
+    footnotes = []
+    for _, r in summ.iterrows():
+        cid = int(r.Cluster)
+        side_counts = {
+            "below": int(r.n_seeds_omission),
+            "above": int(r.n_seeds_hallucination),
+            "on": int(r.n_seeds_balanced),
+        }
+        n_same_side = max(side_counts.values())
+        both_low = (r.GT_mean < 0.3) and (r.GEN_mean < 0.3)
+        mark = []
+        if bool(r.any_low_n):
+            mark.append("†")
+            footnotes.append((cid, display(r.Model), "†"))
+        if both_low:
+            mark.append("‡")
+            footnotes.append((cid, display(r.Model), "‡"))
+        rows.append(
+            {
+                "cluster_id": cid,
+                "cluster_name": names.get(cid, r.cluster_name) + ("".join(mark) if mark else ""),
+                "model": display(r.Model),
+                "ICARE_GT": f"{r.GT_mean:.3f} ± {r.GT_sd:.3f}",
+                "ICARE_GEN": f"{r.GEN_mean:.3f} ± {r.GEN_sd:.3f}",
+                "ICARE_GT_mean": r.GT_mean,
+                "ICARE_GT_sd": r.GT_sd,
+                "ICARE_GEN_mean": r.GEN_mean,
+                "ICARE_GEN_sd": r.GEN_sd,
+                "seeds_same_side": f"{n_same_side}/5",
+                "n_seeds_below": side_counts["below"],
+                "n_seeds_above": side_counts["above"],
+                "n_seeds_on": side_counts["on"],
+                "any_low_n": bool(r.any_low_n),
+                "both_rates_lt_0.3": both_low,
+                "mean_n_gt": r.mean_n_gt,
+                "mean_n_gen": r.mean_n_gen,
+            }
+        )
+    detail = pd.DataFrame(rows)
+
+    # Wide table for LaTeX: one row per cluster
+    wide_rows = []
+    for cid in range(20):
+        row = {"cluster_id": cid, "cluster_name": names.get(cid, "")}
+        marks = set()
+        for model in MODEL_ORDER:
+            sub = detail[(detail.cluster_id == cid) & (detail.model == display(model))]
+            if sub.empty:
+                continue
+            r = sub.iloc[0]
+            pref = display(model)
+            row[f"{pref}_ICARE_GT"] = r.ICARE_GT
+            row[f"{pref}_ICARE_GEN"] = r.ICARE_GEN
+            row[f"{pref}_seeds_same_side"] = r.seeds_same_side
+            if r.any_low_n:
+                marks.add("†")
+            if r["both_rates_lt_0.3"]:
+                marks.add("‡")
+        row["cluster_name"] = names.get(cid, "") + ("".join(sorted(marks)) if marks else "")
+        wide_rows.append(row)
+    wide = pd.DataFrame(wide_rows)
+
+    # Summary rows
+    def jac_ci(model: str, metric: str, pair_type: str) -> Tuple[float, float, float]:
+        sub = jac[(jac.Model == model) & (jac.metric == metric) & (jac.pair_type == pair_type)]
+        vals = sub.jaccard.to_numpy(dtype=float)
+        vals = vals[np.isfinite(vals)]
+        if vals.size == 0:
+            return float("nan"), float("nan"), float("nan")
+        rng = np.random.default_rng(0)
+        boots = np.array([vals[rng.integers(0, len(vals), len(vals))].mean() for _ in range(2000)])
+        return float(vals.mean()), float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))
+
+    overlap = meta.get("overlap", {})
+    n_common = overlap.get("intersection_all_5", 9569)
+    n_union = overlap.get("union_all_5", overlap.get("total_unique_questions", 78708))
+
+    summary_rows = []
+    for model in MODEL_ORDER:
+        lc = lab[lab.Model == model].iloc[0]
+        same_gt = jac_ci(model, "gt_reports_as_ref", "same_report_across_seeds")
+        diff_gt = jac_ci(model, "gt_reports_as_ref", "different_reports")
+        same_gen = jac_ci(model, "gen_reports_as_ref", "same_report_across_seeds")
+        diff_gen = jac_ci(model, "gen_reports_as_ref", "different_reports")
+        summary_rows.append(
+            {
+                "model": display(model),
+                "pct_clusters_same_side_all_5_seeds": lc.pct_same_label_all_clusters,
+                "median_across_seed_SD_ICARE_GT": lc.median_GT_sd,
+                "median_across_seed_SD_ICARE_GEN": lc.median_GEN_sd,
+                "jaccard_same_report_gt_mean": same_gt[0],
+                "jaccard_same_report_gt_CI95": f"[{same_gt[1]:.3f}, {same_gt[2]:.3f}]",
+                "jaccard_diff_report_gt_mean": diff_gt[0],
+                "jaccard_diff_report_gt_CI95": f"[{diff_gt[1]:.3f}, {diff_gt[2]:.3f}]",
+                "jaccard_same_report_gen_mean": same_gen[0],
+                "jaccard_same_report_gen_CI95": f"[{same_gen[1]:.3f}, {same_gen[2]:.3f}]",
+                "jaccard_diff_report_gen_mean": diff_gen[0],
+                "jaccard_diff_report_gen_CI95": f"[{diff_gen[1]:.3f}, {diff_gen[2]:.3f}]",
+                "unique_questions_common_all_5_seeds": f"{n_common} / {n_union}",
+            }
+        )
+    summary = pd.DataFrame(summary_rows)
+
+    wide.to_csv(out / "SuppTableA_exp5.csv", index=False)
+    summary.to_csv(out / "SuppTableA_exp5_summary.csv", index=False)
+    detail.to_csv(out / "SuppTableA_exp5_long.csv", index=False)
+
+    # LaTeX
+    lines = [
+        r"% Supp Table A — Exp 5 evaluation-seed consistency (K=20)",
+        r"\begin{table*}[t]",
+        r"\centering",
+        r"\small",
+        r"\caption{Evaluation-seed consistency of ICARE cluster scores (K=20).}",
+        r"\label{tab:supp_exp5}",
+        r"\begin{tabular}{ll" + "ccc" * 3 + "}",
+        r"\toprule",
+        r"ID & Name & "
+        + " & ".join(
+            [
+                r"\multicolumn{3}{c}{" + _tex(display(m)) + "}"
+                for m in MODEL_ORDER
+            ]
+        )
+        + r" \\",
+        r"\cmidrule(lr){3-5}\cmidrule(lr){6-8}\cmidrule(lr){9-11}",
+        r" & & "
+        + " & ".join([r"GT & GEN & side"] * 3)
+        + r" \\",
+        r"\midrule",
+    ]
+    for _, r in wide.iterrows():
+        cells = [str(int(r.cluster_id)), _tex(r.cluster_name)[:40]]
+        for m in MODEL_ORDER:
+            pref = display(m)
+            cells += [
+                str(r.get(f"{pref}_ICARE_GT", "")),
+                str(r.get(f"{pref}_ICARE_GEN", "")),
+                str(r.get(f"{pref}_seeds_same_side", "")),
+            ]
+        lines.append(" & ".join(cells) + r" \\")
+    lines += [
+        r"\bottomrule",
+        r"\end{tabular}",
+        r"\begin{flushleft}\footnotesize",
+        r"$^\dagger$Cluster with $<$30 questions on either side in any of the 5 evaluation seeds. ",
+        r"$^\ddagger$Cluster with ICARE-GT and ICARE-GEN both $<$0.3. ",
+        r"GT/GEN: across-seed mean $\pm$ SD. side: number of seeds on the modal side of the diagonal.",
+        r"\end{flushleft}",
+        r"\end{table*}",
+        "",
+        r"% Summary",
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\small",
+        r"\caption{Exp 5 summary across models.}",
+        r"\label{tab:supp_exp5_summary}",
+        r"\begin{tabular}{lcccc}",
+        r"\toprule",
+        r"Model & \% same side (5/5) & med.\ SD GT & med.\ SD GEN & Q common \\",
+        r"\midrule",
+    ]
+    for _, r in summary.iterrows():
+        lines.append(
+            f"{_tex(r.model)} & {r.pct_clusters_same_side_all_5_seeds:.1f} & "
+            f"{r.median_across_seed_SD_ICARE_GT:.3f} & {r.median_across_seed_SD_ICARE_GEN:.3f} & "
+            f"{r.unique_questions_common_all_5_seeds} \\\\"
+        )
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table*}", ""]
+    # Jaccard latex block
+    lines += [
+        r"% Jaccard",
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\footnotesize",
+        r"\caption{Report-level Jaccard of clusters probed (Exp 5).}",
+        r"\label{tab:supp_exp5_jaccard}",
+        r"\begin{tabular}{llcc}",
+        r"\toprule",
+        r"Model & Metric & Same report (95\% CI) & Different reports (95\% CI) \\",
+        r"\midrule",
+    ]
+    for _, r in summary.iterrows():
+        lines.append(
+            f"{_tex(r.model)} & GT-ref & "
+            f"{r.jaccard_same_report_gt_mean:.3f} {r.jaccard_same_report_gt_CI95} & "
+            f"{r.jaccard_diff_report_gt_mean:.3f} {r.jaccard_diff_report_gt_CI95} \\\\"
+        )
+        lines.append(
+            f" & GEN-ref & "
+            f"{r.jaccard_same_report_gen_mean:.3f} {r.jaccard_same_report_gen_CI95} & "
+            f"{r.jaccard_diff_report_gen_mean:.3f} {r.jaccard_diff_report_gen_CI95} \\\\"
+        )
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table*}", ""]
+    (out / "SuppTableA_exp5.tex").write_text("\n".join(lines))
+    print(f"Wrote SuppTableA → {out}")
+    return wide, summary
+
+
+# ========================= Exp 4 helpers =========================
+
+def load_scores(exp4: Path, k: int) -> pd.DataFrame:
+    p = exp4 / "model_seeds_all" / f"scores_K{k}.csv"
+    return pd.read_csv(p)
+
+
+def load_correspondence(exp4: Path, k: int) -> np.ndarray:
+    npy = exp4 / "model_seeds_all" / f"correspondence_K{k}.npy"
+    if npy.is_file():
+        return np.load(npy)
+    csv = pd.read_csv(exp4 / "model_seeds_all" / f"correspondence_K{k}.csv", index_col=0)
+    return csv.to_numpy(dtype=float)
+
+
+def spearman_gt_gen(scores_k20: pd.DataFrame, scores_new: pd.DataFrame, mat: np.ndarray, model: str) -> Tuple[float, float, int]:
+    """Question-weighted Spearman of ICARE-GT and ICARE-GEN vs K=20 (n=20 clusters)."""
+    so = scores_k20[scores_k20.Model == model].set_index("Cluster")
+    sn = scores_new[scores_new.Model == model].set_index("Cluster")
+    orig_gt, map_gt, orig_gen, map_gen = [], [], [], []
+    for oid in range(20):
+        if oid not in so.index:
+            continue
+        w = mat[oid].astype(float)
+        tot = w.sum()
+        if tot <= 0:
+            continue
+        w = w / tot
+        gts, gens, ww = [], [], []
+        for j, weight in enumerate(w):
+            if weight <= 0 or j not in sn.index:
+                continue
+            if not np.isfinite(sn.loc[j, "GT"]) or not np.isfinite(sn.loc[j, "GEN"]):
+                continue
+            gts.append(float(sn.loc[j, "GT"]))
+            gens.append(float(sn.loc[j, "GEN"]))
+            ww.append(weight)
+        if not ww:
+            continue
+        ww = np.asarray(ww)
+        ww = ww / ww.sum()
+        if not np.isfinite(so.loc[oid, "GT"]) or not np.isfinite(so.loc[oid, "GEN"]):
+            continue
+        orig_gt.append(float(so.loc[oid, "GT"]))
+        map_gt.append(float(np.dot(ww, gts)))
+        orig_gen.append(float(so.loc[oid, "GEN"]))
+        map_gen.append(float(np.dot(ww, gens)))
+    n = len(orig_gt)
+    if n < 3:
+        return float("nan"), float("nan"), n
+    rho_gt = float(spearmanr(orig_gt, map_gt).correlation)
+    rho_gen = float(spearmanr(orig_gen, map_gen).correlation)
+    return rho_gt, rho_gen, n
+
+
+def below_above_counts(scores: pd.DataFrame, model: str, k: int) -> dict:
+    sub = scores[scores.Model == model]
+    below = int((sub.GT < sub.GEN).sum())
+    above = int((sub.GT > sub.GEN).sum())
+    on = int((sub.GT == sub.GEN).sum())
+    return {
+        "n_below": below,
+        "n_above": above,
+        "n_on": on,
+        "pct_below": 100.0 * below / k,
+        "pct_above": 100.0 * above / k,
+    }
+
+
+def build_exp4_metrics(exp4: Path) -> pd.DataFrame:
+    cons = pd.read_csv(exp4 / "model_seeds_all" / "consistency_by_K.csv")
+    s20 = load_scores(exp4, 20)
+    rows = []
+    for k in KS:
+        sk = load_scores(exp4, k)
+        mat = load_correspondence(exp4, k)
+        for model in MODEL_ORDER:
+            ba = below_above_counts(sk, model, k)
+            csub = cons[(cons.K == k) & (cons.Model == model)]
+            pct_agree = float(csub.pct_label_match_best.iloc[0]) if len(csub) else float("nan")
+            rho_gt, rho_gen, n_sp = spearman_gt_gen(s20, sk, mat, model)
+            rows.append(
+                {
+                    "K": k,
+                    "Model": model,
+                    "model_display": display(model),
+                    **ba,
+                    "label_agreement_pct": pct_agree,
+                    "spearman_ICARE_GT": rho_gt,
+                    "spearman_ICARE_GEN": rho_gen,
+                    "spearman_n": n_sp,
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str], out: Path) -> Dict[str, pd.DataFrame]:
+    fig = plt.figure(figsize=(FIG_W, FIG_W * 1.35))
+    gs = fig.add_gridspec(3, 1, height_ratios=[0.9, 0.9, 2.2], hspace=0.35)
+    gs_top = gs[0].subgridspec(1, 2, wspace=0.3)
+    gs_mid = gs[1].subgridspec(1, 1)
+    gs_grid = gs[2].subgridspec(4, 3, hspace=0.35, wspace=0.22)
+
+    colors = {
+        "mimic-cxr-findings-baseline": "#1b9e77",
+        "chexpert-mimic-cxr-findings-baseline": "#d95f02",
+        "maira-2": "#7570b3",
+    }
+
+    # (a) % below diagonal vs K
+    axa = fig.add_subplot(gs_top[0, 0])
+    for model in MODEL_ORDER:
+        sub = metrics[metrics.Model == model].sort_values("K")
+        axa.plot(sub.K, sub.pct_below, "-o", color=colors[model], ms=4, lw=1.2, label=display(model))
+    axa.axvline(20, ls="--", c="0.4", lw=0.8)
+    axa.set_xticks(KS)
+    axa.set_xlabel("Number of clusters (K)")
+    axa.set_ylabel("% clusters below diagonal")
+    axa.set_ylim(0, 100)
+    axa.grid(True, alpha=0.25, lw=0.4)
+    axa.legend(fontsize=5.5, loc="best", frameon=True)
+    panel_letter(axa, "(a)")
+
+    # (b) label agreement vs K
+    axb = fig.add_subplot(gs_top[0, 1])
+    for model in MODEL_ORDER:
+        sub = metrics[metrics.Model == model].sort_values("K")
+        axb.plot(sub.K, sub.label_agreement_pct, "-o", color=colors[model], ms=4, lw=1.2, label=display(model))
+    axb.axvline(20, ls="--", c="0.4", lw=0.8)
+    axb.set_xticks(KS)
+    axb.set_xlabel("Number of clusters (K)")
+    axb.set_ylabel("% label agreement with K=20")
+    axb.set_ylim(0, 105)
+    axb.grid(True, alpha=0.25, lw=0.4)
+    axb.legend(fontsize=5.5, loc="best", frameon=True)
+    panel_letter(axb, "(b)")
+
+    # (c) Spearman GT / GEN vs K
+    axc = fig.add_subplot(gs_mid[0, 0])
+    for model in MODEL_ORDER:
+        sub = metrics[metrics.Model == model].sort_values("K")
+        axc.plot(sub.K, sub.spearman_ICARE_GT, "-o", color=colors[model], ms=4, lw=1.2, label=f"{display(model)} ICARE-GT")
+        axc.plot(sub.K, sub.spearman_ICARE_GEN, "--s", color=colors[model], ms=3.5, lw=1.0, label=f"{display(model)} ICARE-GEN")
+    axc.axvline(20, ls="--", c="0.4", lw=0.8)
+    axc.set_xticks(KS)
+    axc.set_xlabel("Number of clusters (K)")
+    axc.set_ylabel("Spearman correlation with K=20")
+    axc.set_ylim(0, 1.05)
+    axc.grid(True, alpha=0.25, lw=0.4)
+    axc.legend(fontsize=5, ncol=2, loc="lower right", frameon=True)
+    panel_letter(axc, "(c)")
+
+    # (d) Fig. 4-style grid
+    source_d = []
+    for ri, k in enumerate(KS_GRID):
+        sk = load_scores(exp4, k)
+        name_map = load_names(exp4, k)
+        for ci, model in enumerate(MODEL_ORDER):
+            ax = fig.add_subplot(gs_grid[ri, ci])
+            sub = sk[sk.Model == model]
+            nmax = max(sub.n_gt.max(), 1)
+            for _, r in sub.iterrows():
+                side = side_of_diagonal(r.GT, r.GEN)
+                s = 8 + 40 * (float(r.n_gt) / nmax)
+                ax.scatter(r.GEN, r.GT, s=s, c=side_color(side), alpha=0.85, edgecolors="none", zorder=3)
+                ax.annotate(str(int(r.Cluster)), (r.GEN, r.GT), fontsize=4.5, ha="center", va="center", zorder=4)
+                source_d.append(
+                    {
+                        "K": k,
+                        "model": display(model),
+                        "cluster_id": int(r.Cluster),
+                        "cluster_name": name_map.get(int(r.Cluster), ""),
+                        "ICARE_GEN": r.GEN,
+                        "ICARE_GT": r.GT,
+                        "n_gt": r.n_gt,
+                        "n_gen": r.n_gen,
+                        "side_of_diagonal": side,
+                    }
+                )
+            ax.plot([0, 1], [0, 1], "k--", lw=0.5, alpha=0.7, zorder=1)
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.set_aspect("equal", adjustable="box")
+            ax.tick_params(labelsize=5)
+            if ri == 3:
+                ax.set_xlabel("ICARE-GEN", fontsize=6)
+            else:
+                ax.set_xticklabels([])
+            if ci == 0:
+                ax.set_ylabel(f"K={k}\nICARE-GT", fontsize=6)
+            else:
+                ax.set_yticklabels([])
+            if ri == 0:
+                ax.text(0.5, 1.08, display(model), transform=ax.transAxes, ha="center", va="bottom", fontsize=6, fontweight="bold")
+            if ri == 0 and ci == 0:
+                panel_letter(ax, "(d)", x=-0.25, y=1.15)
+                legend_side_size(ax, loc="upper left")
+
+    save_fig(fig, out / "SuppFigB_exp4_k_sensitivity")
+    return {
+        "metrics": metrics,
+        "fig_d": pd.DataFrame(source_d),
+        "fig_a": metrics[["K", "model_display", "pct_below"]].copy(),
+        "fig_b": metrics[["K", "model_display", "label_agreement_pct"]].copy(),
+        "fig_c": metrics[["K", "model_display", "spearman_ICARE_GT", "spearman_ICARE_GEN"]].copy(),
+    }
+
+
+def build_supp_table_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str], out: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    part1 = metrics.copy()
+    part1.to_csv(out / "SuppTableB_exp4_part1.csv", index=False)
+
+    ct = pd.read_csv(exp4 / "model_seeds_all" / "concept_tracking.csv")
+    concepts = ["Lung Lobe Abnormality", "Calcified Granuloma Location"]
+    rows = []
+    for k in KS:
+        sk = load_scores(exp4, k)
+        name_map = load_names(exp4, k)
+        for concept in concepts:
+            for model in MODEL_ORDER:
+                sub = ct[(ct.K == k) & (ct.concept == concept) & (ct.Model == model) & (ct.is_matched)]
+                if sub.empty:
+                    continue
+                r = sub.iloc[0]
+                cid = int(r.cluster_id)
+                sc = sk[(sk.Model == model) & (sk.Cluster == cid)]
+                if sc.empty:
+                    continue
+                s = sc.iloc[0]
+                gt_lo, gt_hi = wilson_ci(float(s.GT), int(s.n_gt))
+                gen_lo, gen_hi = wilson_ci(float(s.GEN), int(s.n_gen))
+                side = side_of_diagonal(s.GT, s.GEN)
+                mark = "†" if bool(s.low_n) else ""
+                # best-matching K=20 name
+                if k == 20:
+                    k20_name = names20.get(cid, name_map.get(cid, ""))
+                    share = 1.0
+                    k20_id = cid
+                else:
+                    k20_id = int(s.best_k20_cluster) if "best_k20_cluster" in s and pd.notna(s.best_k20_cluster) else -1
+                    k20_name = names20.get(k20_id, str(s.get("best_k20_name", "")))
+                    share = float(s.best_k20_share) if "best_k20_share" in s and pd.notna(s.best_k20_share) else float(r.instance_share)
+                rows.append(
+                    {
+                        "K": k,
+                        "concept": concept,
+                        "model": display(model),
+                        "matched_cluster_id": cid,
+                        "matched_cluster_name_or_k20": (name_map.get(cid) or k20_name) + mark,
+                        "best_k20_id": k20_id,
+                        "best_k20_name": k20_name,
+                        "share": share if k != 20 else float(r.instance_share),
+                        "ICARE_GT": float(s.GT),
+                        "ICARE_GT_CI95": f"[{gt_lo:.3f}, {gt_hi:.3f}]",
+                        "ICARE_GEN": float(s.GEN),
+                        "ICARE_GEN_CI95": f"[{gen_lo:.3f}, {gen_hi:.3f}]",
+                        "n_gt": int(s.n_gt),
+                        "n_gen": int(s.n_gen),
+                        "side_of_diagonal": side,
+                        "low_n": bool(s.low_n),
+                        "delta_boot_CI95": f"[{s.CI_low:.3f}, {s.CI_high:.3f}]",
+                    }
+                )
+    part2 = pd.DataFrame(rows)
+    part2.to_csv(out / "SuppTableB_exp4_part2.csv", index=False)
+
+    # LaTeX part 1
+    lines = [
+        r"% Supp Table B Part 1",
+        r"\begin{table*}[t]",
+        r"\centering",
+        r"\footnotesize",
+        r"\caption{Exp 4: sensitivity to number of clusters $K$.}",
+        r"\label{tab:supp_exp4_part1}",
+        r"\begin{tabular}{llrrrrrr}",
+        r"\toprule",
+        r"$K$ & Model & Below ($n$) & Below (\%) & Above ($n$) & Above (\%) & Agree w/ $K$=20 (\%) & Spearman GT / GEN \\",
+        r"\midrule",
+    ]
+    for _, r in part1.sort_values(["K", "Model"]).iterrows():
+        lines.append(
+            f"{int(r.K)} & {_tex(r.model_display)} & "
+            f"{int(r.n_below)} & {r.pct_below:.1f} & {int(r.n_above)} & {r.pct_above:.1f} & "
+            f"{r.label_agreement_pct:.1f} & {r.spearman_ICARE_GT:.3f} / {r.spearman_ICARE_GEN:.3f} \\\\"
+        )
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table*}", ""]
+
+    lines += [
+        r"% Supp Table B Part 2",
+        r"\begin{table*}[t]",
+        r"\centering",
+        r"\footnotesize",
+        r"\caption{Exp 4: Lung Lobe Abnormality and Calcified Granuloma Location across $K$.}",
+        r"\label{tab:supp_exp4_part2}",
+        r"\begin{tabular}{lllrlrrll}",
+        r"\toprule",
+        r"$K$ & Concept & Model & ID & K20 name (share) & ICARE-GT [95\% CI] & ICARE-GEN [95\% CI] & $n_{\mathrm{gt}}/n_{\mathrm{gen}}$ & Side \\",
+        r"\midrule",
+    ]
+    for _, r in part2.sort_values(["concept", "K", "model"]).iterrows():
+        side_lab = {"below": "below", "above": "above", "on": "on"}[r.side_of_diagonal]
+        lines.append(
+            f"{int(r.K)} & {r.concept} & {_tex(r.model)} & {int(r.matched_cluster_id)} & "
+            f"{_tex(r.best_k20_name)[:28]} ({r.share:.2f}) & "
+            f"{r.ICARE_GT:.3f} {r.ICARE_GT_CI95} & {r.ICARE_GEN:.3f} {r.ICARE_GEN_CI95} & "
+            f"{int(r.n_gt)}/{int(r.n_gen)}{'†' if r.low_n else ''} & {side_lab} \\\\"
+        )
+    lines += [
+        r"\bottomrule",
+        r"\end{tabular}",
+        r"\begin{flushleft}\footnotesize $^\dagger$$n_{\mathrm{gt}}$ or $n_{\mathrm{gen}}$ $<$ 30. "
+        r"Rate 95\% CIs are Wilson intervals from instance counts; bootstrap CIs in source data are for GT$-$GEN.",
+        r"\end{flushleft}",
+        r"\end{table*}",
+    ]
+    (out / "SuppTableB_exp4.tex").write_text("\n".join(lines))
+    print(f"Wrote SuppTableB → {out}")
+    return part1, part2
+
+
+def build_supp_table_c(exp4: Path, names20: Dict[int, str], out: Path) -> pd.DataFrame:
+    rows = []
+    for k in KS_GRID:
+        sk = load_scores(exp4, k)
+        name_map = load_names(exp4, k)
+        # correspondence is shared across models; take first model for mapping cols
+        model0 = MODEL_ORDER[0]
+        sub = sk[sk.Model == model0]
+        for _, r in sub.iterrows():
+            cid = int(r.Cluster)
+            if "best_k20_cluster" in r and pd.notna(r.best_k20_cluster):
+                k20_id = int(r.best_k20_cluster)
+                share = float(r.best_k20_share)
+                k20_name = names20.get(k20_id, str(r.get("best_k20_name", "")))
+            else:
+                k20_id, share, k20_name = -1, float("nan"), ""
+            local_name = name_map.get(cid, "")
+            rows.append(
+                {
+                    "K": k,
+                    "cluster_id": cid,
+                    "cluster_name": local_name,  # filled when cluster_names_K{K}.json present
+                    "best_k20_id": k20_id,
+                    "best_k20_name": k20_name,
+                    "best_k20_share": share,
+                }
+            )
+    df = pd.DataFrame(rows)
+    df.to_csv(out / "SuppTableC_exp4_cluster_keys.csv", index=False)
+
+    lines = [
+        r"% Supp Table C — cluster keys",
+        r"\begin{table}[t]",
+        r"\centering",
+        r"\footnotesize",
+        r"\caption{Exp 4 cluster keys: best-matching $K$=20 name and share.}",
+        r"\label{tab:supp_exp4_keys}",
+        r"\begin{tabular}{rrlrl}",
+        r"\toprule",
+        r"$K$ & ID & Name (if available) & Best $K$=20 ID & Best $K$=20 name (share) \\",
+        r"\midrule",
+    ]
+    for _, r in df.sort_values(["K", "cluster_id"]).iterrows():
+        nm = str(r.cluster_name) if r.cluster_name else "—"
+        lines.append(
+            f"{int(r.K)} & {int(r.cluster_id)} & {_tex(nm)[:32]} & "
+            f"{int(r.best_k20_id)} & {_tex(r.best_k20_name)[:36]} ({r.best_k20_share:.2f}) \\\\"
+        )
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table*}"]
+    (out / "SuppTableC_exp4_cluster_keys.tex").write_text("\n".join(lines))
+    print(f"Wrote SuppTableC → {out}")
+    return df
+
+
+def _xml_escape(s: str) -> str:
+    return (
+        str(s)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
+def _write_xlsx_stdlib(path: Path, sheets: Dict[str, pd.DataFrame]) -> None:
+    """Minimal XLSX writer (no openpyxl) for Source Data sheets."""
+    import zipfile
+    from xml.sax.saxutils import escape
+
+    def col_name(i: int) -> str:
+        s = ""
+        i += 1
+        while i:
+            i, r = divmod(i - 1, 26)
+            s = chr(65 + r) + s
+        return s
+
+    def sheet_xml(df: pd.DataFrame) -> str:
+        rows_xml = []
+        # header
+        cells = []
+        for j, col in enumerate(df.columns):
+            ref = f"{col_name(j)}1"
+            cells.append(
+                f'<c r="{ref}" t="inlineStr"><is><t>{escape(str(col))}</t></is></c>'
+            )
+        rows_xml.append(f'<row r="1">{"".join(cells)}</row>')
+        for i, row in enumerate(df.itertuples(index=False), start=2):
+            cells = []
+            for j, val in enumerate(row):
+                ref = f"{col_name(j)}{i}"
+                if val is None or (isinstance(val, float) and np.isnan(val)):
+                    continue
+                if isinstance(val, (int, np.integer)):
+                    cells.append(f'<c r="{ref}"><v>{int(val)}</v></c>')
+                elif isinstance(val, (float, np.floating)):
+                    cells.append(f'<c r="{ref}"><v>{float(val)}</v></c>')
+                elif isinstance(val, (bool, np.bool_)):
+                    cells.append(f'<c r="{ref}" t="b"><v>{1 if val else 0}</v></c>')
+                else:
+                    cells.append(
+                        f'<c r="{ref}" t="inlineStr"><is><t>{escape(str(val))}</t></is></c>'
+                    )
+            rows_xml.append(f'<row r="{i}">{"".join(cells)}</row>')
+        return (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            f'<sheetData>{"".join(rows_xml)}</sheetData></worksheet>'
+        )
+
+    names = list(sheets.keys())
+    workbook = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        "<sheets>"
+        + "".join(
+            f'<sheet name="{escape(n[:31])}" sheetId="{i+1}" r:id="rId{i+1}"/>'
+            for i, n in enumerate(names)
+        )
+        + "</sheets></workbook>"
+    )
+    wb_rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + "".join(
+            f'<Relationship Id="rId{i+1}" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+            f'Target="xl/worksheets/sheet{i+1}.xml"/>'
+            for i in range(len(names))
+        )
+        # fix: workbook rels should point to worksheets with worksheet type
+        + "</Relationships>"
+    )
+    # Correct workbook relationships
+    wb_rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        + "".join(
+            f'<Relationship Id="rId{i+1}" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+            f'Target="worksheets/sheet{i+1}.xml"/>'
+            for i in range(len(names))
+        )
+        + "</Relationships>"
+    )
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/xl/workbook.xml" '
+        'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        + "".join(
+            f'<Override PartName="/xl/worksheets/sheet{i+1}.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+            for i in range(len(names))
+        )
+        + "</Types>"
+    )
+    root_rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        'Target="xl/workbook.xml"/>'
+        "</Relationships>"
+    )
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", content_types)
+        z.writestr("_rels/.rels", root_rels)
+        z.writestr("xl/workbook.xml", workbook)
+        z.writestr("xl/_rels/workbook.xml.rels", wb_rels)
+        for i, (name, df) in enumerate(sheets.items(), start=1):
+            z.writestr(f"xl/worksheets/sheet{i}.xml", sheet_xml(df))
+
+
+def write_source_data(out: Path, sheets: Dict[str, pd.DataFrame]) -> None:
+    xlsx = out / "SourceData_R2.xlsx"
+    try:
+        import openpyxl  # noqa: F401
+        with pd.ExcelWriter(xlsx, engine="openpyxl") as writer:
+            for name, df in sheets.items():
+                df.to_excel(writer, sheet_name=name[:31], index=False)
+    except Exception:
+        _write_xlsx_stdlib(xlsx, sheets)
+    # Always also dump CSVs for transparency
+    sd = out / "SourceData_R2_csv"
+    sd.mkdir(exist_ok=True)
+    for name, df in sheets.items():
+        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in name)[:40]
+        df.to_csv(sd / f"{safe}.csv", index=False)
+    print(f"Wrote {xlsx}")
+
+
+def write_captions(out: Path) -> None:
+    text = """# Captions — R2 supplementary figures and tables (Exp 4–5)
+
+Data: IU X-ray; 590 reports per model. Evaluation uses five evaluation seeds with model seeds pooled as in Fig. 4. Side of the diagonal follows Fig. 4: below the diagonal = omission-dominated (ICARE-GT < ICARE-GEN); above the diagonal = hallucination-dominated (ICARE-GT > ICARE-GEN). K=20 was chosen with radiologists. Cluster point labels are IDs; names appear in key panels and tables.
+
+## Supp Fig. A
+**Supplementary Figure A. Evaluation-seed consistency of ICARE cluster scores (K=20).**  
+(a–c) Across-seed mean ICARE-GEN (x) versus mean ICARE-GT (y) for CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC and MAIRA2. Error bars show the across-seed standard deviation over five evaluation seeds. Point size scales with mean question count; colour encodes side of the diagonal (red: below / omission-dominated; blue: above / hallucination-dominated). Points are labelled by K=20 cluster ID. The dashed line is the identity. (d) Cluster ID → name key.
+
+## Supp Table A
+**Supplementary Table A. Evaluation-seed consistency at K=20.**  
+For each cluster and model: ICARE-GT and ICARE-GEN as across-seed mean ± SD, and the number of seeds on the modal side of the diagonal (out of 5). Footnotes mark clusters with fewer than 30 questions on either side in any seed (†) and clusters with ICARE-GT and ICARE-GEN both < 0.3 (‡). Summary rows report the percentage of clusters on the same side of the diagonal in all five seeds; median across-seed SD of ICARE-GT and of ICARE-GEN; report-level Jaccard of clusters probed for the same report across seeds versus different reports (mean with 95% CI); and unique questions common to all five seeds (9,569 / 78,708).
+
+## Supp Fig. B
+**Supplementary Figure B. Sensitivity of ICARE cluster structure and scores to the number of clusters K.**  
+(a) Percentage of clusters below the diagonal (ICARE-GT < ICARE-GEN) versus K for each model. (b) Label agreement with K=20: percentage of K=20 clusters whose best-matching cluster at the new K lies on the same side of the diagonal. (c) Spearman correlation with K=20 for ICARE-GT (solid) and ICARE-GEN (dashed), comparing each K=20 cluster to the question-weighted value of the clusters its questions map to at the new K. Dashed vertical line: K=20. (d) Fig. 4–style scatterplots for K = 10, 15, 25, 30 (rows) and the three models (columns); points labelled by cluster ID and coloured by side of the diagonal; size encodes question count.
+
+## Supp Table B
+**Supplementary Table B. Sensitivity to K (Exp 4).**  
+Part 1: for each K and model, counts and percentages of clusters below / above the diagonal, label agreement with K=20 (%), and Spearman correlations for ICARE-GT and ICARE-GEN (n = 20). Part 2: Lung Lobe Abnormality and Calcified Granuloma Location — best-matching cluster at each K (with share); per model, ICARE-GT and ICARE-GEN with 95% CIs, n_gt / n_gen, and side of the diagonal; † marks < 30 questions.
+
+## Supp Table C
+**Supplementary Table C. Cluster keys for K = 10, 15, 25, 30.**  
+Cluster ID → best-matching K=20 cluster name and share. Local names are filled when `cluster_names_K{K}.json` is present (LLM naming can be applied later without recomputing scores).
+"""
+    (out / "captions.md").write_text(text)
+    print(f"Wrote {out / 'captions.md'}")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--root",
+        type=Path,
+        default=Path(__file__).resolve().parents[2],
+        help="Repo root (ICARE_score_rev_stats)",
+    )
+    ap.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Output directory (default: results/revision_r2/final)",
+    )
+    args = ap.parse_args()
+    root: Path = args.root
+    out: Path = args.out or (root / "results" / "revision_r2" / "final")
+    exp4 = root / "results" / "revision_r2" / "exp4"
+    exp5 = root / "results" / "revision_r2" / "exp5"
+    out.mkdir(parents=True, exist_ok=True)
+
+    print("=== Model-name mapping (from cluster_analysis.py) ===")
+    for raw, disp in MODEL_DISPLAY_NAMES.items():
+        print(f"  {raw!r} → {disp!r}")
+    print("Plot order:", [display(m) for m in MODEL_ORDER])
+
+    setup_style()
+    names20 = load_names(exp4, 20)
+    if not names20:
+        print("ERROR: cluster_names_K20.json not found", file=sys.stderr)
+        return 1
+
+    fig_a_src = build_supp_fig_a(exp5, names20, out)
+    tab_a_wide, tab_a_sum = build_supp_table_a(exp5, names20, out)
+
+    metrics = build_exp4_metrics(exp4)
+    metrics.to_csv(out / "exp4_metrics_for_supp.csv", index=False)
+    fig_b_src = build_supp_fig_b(exp4, metrics, names20, out)
+    tab_b1, tab_b2 = build_supp_table_b(exp4, metrics, names20, out)
+    tab_c = build_supp_table_c(exp4, names20, out)
+
+    write_captions(out)
+    sheets = {
+        "FigA_panels_abc": fig_a_src,
+        "FigA_key": pd.DataFrame({"cluster_id": list(range(20)), "cluster_name": [names20.get(i, "") for i in range(20)]}),
+        "TableA_clusters": tab_a_wide,
+        "TableA_summary": tab_a_sum,
+        "FigB_a_pct_below": fig_b_src["fig_a"],
+        "FigB_b_label_agree": fig_b_src["fig_b"],
+        "FigB_c_spearman": fig_b_src["fig_c"],
+        "FigB_d_grid": fig_b_src["fig_d"],
+        "TableB_part1": tab_b1,
+        "TableB_part2": tab_b2,
+        "TableC_keys": tab_c,
+    }
+    write_source_data(out, sheets)
+
+    print("\n=== Outputs ===")
+    for p in sorted(out.rglob("*")):
+        if p.is_file():
+            print(f"  {p.relative_to(root)}  ({p.stat().st_size} bytes)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

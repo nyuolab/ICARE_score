@@ -1,0 +1,81 @@
+K,cluster_id,cluster_name,best_k20_id,best_k20_name,best_k20_share
+10,0,,9,Aortic Condition,0.8815911193339501
+10,1,,0,Lung Condition Assessment,0.593061201122116
+10,2,,10,Pneumothorax Diagnosis,0.9128888888888887
+10,3,,8,Additional Radiologic Findings,0.3815225046417824
+10,4,,14,Cardiac and Mediastinal Contours,0.8488127442140067
+10,5,,12,Lung Lobe Abnormality,0.4842002916869227
+10,6,,19,Heart Abnormality Presence,0.5336694274396832
+10,7,,16,Focal Airspace Opacity,0.6770256526161148
+10,8,,7,Pleural Effusion Presence,0.7930708288991368
+10,9,,1,Thoracic Spine Degeneration,0.962091503267974
+15,0,,3,Diaphragm Position Abnormality,0.5832160450387052
+15,1,,5,Heart Size Normalcy,0.916263172885218
+15,2,,10,Pneumothorax Diagnosis,0.9788410675643184
+15,3,,18,Lung Volume Condition,0.6491024898668211
+15,4,,8,Additional Radiologic Findings,0.7066357814416133
+15,5,,0,Lung Condition Assessment,0.8260799092308939
+15,6,,16,Focal Airspace Opacity,0.812605752961083
+15,7,,1,Thoracic Spine Degeneration,0.9911147011308562
+15,8,,19,Heart Abnormality Presence,0.5963687150837989
+15,9,,12,Lung Lobe Abnormality,0.8760858456821666
+15,10,,7,Pleural Effusion Presence,0.8007402101241643
+15,11,,19,Heart Abnormality Presence,0.5386851881763851
+15,12,,15,Osseous Structure Condition,0.9877920437802568
+15,13,,13,Calcified Granuloma Location,0.7174887892376681
+15,14,,9,Aortic Condition,0.9047619047619048
+25,0,,0,Lung Condition Assessment,0.8200361736334405
+25,1,,1,Thoracic Spine Degeneration,0.9947730398899588
+25,2,,3,Diaphragm Position Abnormality,0.6621517027863777
+25,3,,8,Additional Radiologic Findings,0.9251367150669432
+25,4,,13,Calcified Granuloma Location,0.7647907647907648
+25,5,,5,Heart Size Normalcy,0.9827089337175792
+25,6,,3,Diaphragm Position Abnormality,0.4936854190585534
+25,7,,0,Lung Condition Assessment,0.6378091872791519
+25,8,,9,Aortic Condition,0.9202933985330072
+25,9,,2,Pleural Fluid Presence,0.9643444871091608
+25,10,,4,Pulmonary Vascular Condition,0.9288506645817044
+25,11,,6,Lung Opacity and Infiltrates,0.6152777777777778
+25,12,,10,Pneumothorax Diagnosis,0.9883183256266732
+25,13,,19,Heart Abnormality Presence,0.968767274737424
+25,14,,12,Lung Lobe Abnormality,0.9446331521739132
+25,15,,15,Osseous Structure Condition,0.9456585942114588
+25,16,,18,Lung Volume Condition,0.9745590230664858
+25,17,,18,Lung Volume Condition,0.4219489120151372
+25,18,,6,Lung Opacity and Infiltrates,0.9093692590324556
+25,19,,14,Cardiac and Mediastinal Contours,0.9779703864210908
+25,20,,7,Pleural Effusion Presence,0.9859240199788104
+25,21,,15,Osseous Structure Condition,0.9296046287367404
+25,22,,16,Focal Airspace Opacity,0.9576826196473552
+25,23,,8,Additional Radiologic Findings,0.6512141280353201
+25,24,,19,Heart Abnormality Presence,0.617258883248731
+30,0,,3,Diaphragm Position Abnormality,0.9789875835721108
+30,1,,7,Pleural Effusion Presence,0.8127904133039863
+30,2,,8,Additional Radiologic Findings,0.6543478260869565
+30,3,,18,Lung Volume Condition,0.9660779366414354
+30,4,,4,Pulmonary Vascular Condition,0.9039855072463768
+30,5,,12,Lung Lobe Abnormality,0.9817479817479816
+30,6,,0,Lung Condition Assessment,0.9845508717722355
+30,7,,3,Diaphragm Position Abnormality,0.808282208588957
+30,8,,16,Focal Airspace Opacity,0.7530171204041538
+30,9,,10,Pneumothorax Diagnosis,0.9897660818713452
+30,10,,1,Thoracic Spine Degeneration,0.8451479697178252
+30,11,,9,Aortic Condition,0.9957264957264956
+30,12,,15,Osseous Structure Condition,0.9140401146131804
+30,13,,13,Calcified Granuloma Location,0.9653136531365314
+30,14,,0,Lung Condition Assessment,0.3500874125874126
+30,15,,4,Pulmonary Vascular Condition,0.8611620795107033
+30,16,,1,Thoracic Spine Degeneration,0.9857839155158408
+30,17,,6,Lung Opacity and Infiltrates,0.8027118644067797
+30,18,,11,Surgical Clip Location,1.0
+30,19,,14,Cardiac and Mediastinal Contours,0.9900579950289976
+30,20,,6,Lung Opacity and Infiltrates,0.3823857302118171
+30,21,,5,Heart Size Normalcy,0.9927104042412194
+30,22,,16,Focal Airspace Opacity,0.6852941176470588
+30,23,,8,Additional Radiologic Findings,0.944199116820554
+30,24,,19,Heart Abnormality Presence,0.6220633299284984
+30,25,,15,Osseous Structure Condition,0.9587980173482032
+30,26,,19,Heart Abnormality Presence,0.9688639551192146
+30,27,,16,Focal Airspace Opacity,0.8792517006802721
+30,28,,6,Lung Opacity and Infiltrates,0.6780789348549691
+30,29,,17,Lung Clearness and Normalcy,0.9803179409538229
