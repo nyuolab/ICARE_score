@@ -3,6 +3,7 @@
 - sklearn: `1.3.2`
 - Label rule: Fig. 4 point estimate (omission if GT < GEN; hallucination if GT > GEN).
 - Fresh `cluster_questions` for every K including 20; stored names used for K=20 display only.
+- KMeans is run under `threadpoolctl.threadpool_limits(1)` (OpenMP/BLAS=1) for deterministic labels across nodes; scoring/bootstrap keep launcher thread settings.
 - Modes: `model_seeds_all` (primary) and `model_seed_1`.
 
 ## K=20 reproduction (fresh vs stored)
@@ -107,5 +108,5 @@ Per mode under `results/revision_r2/exp4/model_seeds_all/` and `.../model_seed_1
 ## Notes
 
 - Spearman mapped delta: question-instance-weighted mean over **new clusters with defined delta only** (re-normalised). An original cluster is dropped only if **>50%** of its instances fall in undefined new clusters (`n_gen=0`, `n_gt=0`, or non-finite delta). `consistency_by_K.csv` reports `spearman_n_clusters_used` and `spearman_dropped_clusters`.
-- At K=30, cluster **10** is GEN-empty for MIMIC (`n_gen=0`; GT-source / often `XXXX` de-identified text). Mapped deltas ignore it unless >50% of an original cluster’s instances fall there.
+- At K=30, some new clusters can be GEN-empty (often GT-source questions about de-identified `XXXX` text → `n_gen=0`, undefined delta). Mapped deltas ignore those clusters unless an original cluster has >50% of instances there. See scores_K30 / report.
 - `--name` is implemented but was not run in this final pass; K≠20 points use cluster IDs.

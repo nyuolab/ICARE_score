@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 import sklearn
 from scipy.stats import spearmanr
+import threadpoolctl
 from sklearn.metrics import adjusted_rand_score
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -567,7 +568,12 @@ def run_one_mode(
     clusterings = {}
     for k in ks:
         print(f"=== clustering K={k} ===")
-        labels, q2c, reps, sizes = cluster_questions(emb, unique_questions, n_clusters=k)
+        # Pin BLAS/OpenMP to 1 only around KMeans (via cluster_questions) for
+        # cross-run determinism; leave bootstrap/scoring at launcher thread count.
+        with threadpoolctl.threadpool_limits(limits=1):
+            labels, q2c, reps, sizes = cluster_questions(
+                emb, unique_questions, n_clusters=k
+            )
         clusterings[k] = {
             "labels": np.asarray(labels),
             "q2c": q2c,
@@ -730,6 +736,7 @@ def write_top_summary(out_dir: Path, results: Dict[str, Dict], stored_names: Dic
         f"- sklearn: `{sklearn.__version__}`",
         "- Label rule: Fig. 4 point estimate (omission if GT < GEN; hallucination if GT > GEN).",
         "- Fresh `cluster_questions` for every K including 20; stored names used for K=20 display only.",
+        "- KMeans is run under `threadpoolctl.threadpool_limits(1)` (OpenMP/BLAS=1) for deterministic labels across nodes; scoring/bootstrap keep launcher thread settings.",
         "- Modes: `model_seeds_all` (primary) and `model_seed_1`.",
         "",
     ]

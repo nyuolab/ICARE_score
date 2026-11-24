@@ -40,6 +40,8 @@ export OPENBLAS_NUM_THREADS=8
 export OMP_NUM_THREADS=8
 export MKL_NUM_THREADS=8
 export CUDA_VISIBLE_DEVICES=
+# KMeans determinism: cluster_k_sensitivity.py limits OpenMP/BLAS to 1 via
+# threadpoolctl around cluster_questions only; these exports stay at 8 for bootstrap.
 
 echo "Host=$(hostname) pwd=$(pwd) python=$PY_BIN submit=${SLURM_SUBMIT_DIR:-none}"
 "$PY_BIN" -c "import sklearn; print('sklearn', sklearn.__version__)"
