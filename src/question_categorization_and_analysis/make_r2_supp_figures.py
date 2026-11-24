@@ -799,8 +799,6 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                         weight="bold",
                         labelpad=15,
                     )
-            if k == 20:
-                ax.set_facecolor("#eeeeee")
             if ri == 0 and ci == 0:
                 panel_letter_fig4(ax, "a")
             add_correlation_box(ax, xs, ys)
