@@ -18,7 +18,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.lines import Line2D
+from matplotlib import patheffects
 from matplotlib.patches import Patch
 from scipy.stats import spearmanr
 
@@ -47,19 +47,21 @@ COLOR_BELOW = "#d62728"  # omission-dominated: ICARE-GT < ICARE-GEN
 COLOR_ABOVE = "#1f77b4"  # hallucination-dominated: ICARE-GT > ICARE-GEN
 COLOR_ON = "#7f7f7f"     # on diagonal
 
-# Marker / axis style (revised manuscript look; not n/30)
-SIZE_MIN_PT2 = 10.0
-SIZE_MAX_PT2 = 250.0
-MARKER_ALPHA = 0.8
+# Marker / axis style (uniform markers; matches Fig. 4 colours)
+MARKER_SIZE_PT2 = 30.0
+MARKER_ALPHA = 0.85
 FIG4_DIAG_LW = 1.5
 FIG4_DIAG_ALPHA = 0.7
 AX_LIM = (-0.02, 1.03)
+LABEL_ZORDER = 12
+MARKER_ZORDER = 5
+ERRORBAR_ZORDER = 3
 
 KS = [10, 15, 20, 25, 30]
 KS_GRID = [10, 15, 20, 25, 30]  # include K=20 (Fig. 4 setting)
 MM = 1 / 25.4
 FIG_W = 180 * MM  # double-column
-FIG_B_H = 230 * MM
+FIG_B_H = 245 * MM
 CONCEPTS = ("Lung Lobe Abnormality", "Calcified Granuloma Location")
 
 
@@ -133,13 +135,6 @@ def setup_style() -> None:
 
 
 
-def linear_point_sizes(counts, cmin: float, cmax: float) -> np.ndarray:
-    """Linear map counts → [SIZE_MIN_PT2, SIZE_MAX_PT2] on a shared figure scale."""
-    c = np.asarray(counts, dtype=float)
-    if not np.isfinite(cmin) or not np.isfinite(cmax) or cmax <= cmin:
-        return np.full_like(c, 0.5 * (SIZE_MIN_PT2 + SIZE_MAX_PT2), dtype=float)
-    return SIZE_MIN_PT2 + (np.clip(c, cmin, cmax) - cmin) / (cmax - cmin) * (SIZE_MAX_PT2 - SIZE_MIN_PT2)
-
 
 def apply_fig4_axes(ax, *, show_xlabel: bool = True, show_ylabel: bool = True,
                      show_xticklabels: bool = True, show_yticklabels: bool = True) -> None:
@@ -195,86 +190,77 @@ def apply_spines(ax, style: str = "left_bottom") -> None:
         ax.spines["bottom"].set_visible(True)
 
 
-def offset_cluster_labels(ax, xs, ys, labels, fontsize: float = 7.0, objects=None) -> None:
-    """adjustText labels; leader lines only when a label moves far from its point."""
+def _label_stroke():
+    return [patheffects.withStroke(linewidth=2.2, foreground="white")]
+
+
+def offset_cluster_labels(ax, xs, ys, labels, fontsize: float = 7.0) -> None:
+    """ID labels above-right of points; white outline; nudge to avoid label overlap."""
     xs = np.asarray(xs, dtype=float)
     ys = np.asarray(ys, dtype=float)
     mask = np.isfinite(xs) & np.isfinite(ys)
     xs, ys = xs[mask], ys[mask]
     labels = [lab for lab, m in zip(labels, mask) if m]
     n = len(labels)
+    if n == 0:
+        return
+    # Prefer above-right; flip inward near top/right edges to avoid clipping
+    x0, x1 = ax.get_xlim()
+    y0, y1 = ax.get_ylim()
+    xspan = max(x1 - x0, 1e-9)
+    yspan = max(y1 - y0, 1e-9)
+    offsets = np.zeros((n, 2), dtype=float)
+    has = []
     texts = []
     for i, (x, y, lab) in enumerate(zip(xs, ys, labels)):
-        ang = 2.0 * np.pi * (i + 0.5) / max(n, 1)
-        texts.append(
-            ax.text(
-                float(x + 0.015 * np.cos(ang)),
-                float(y + 0.015 * np.sin(ang)),
-                str(lab),
-                fontsize=fontsize,
-                fontweight="bold",
-                ha="center",
-                va="center",
-                color="0.15",
-                zorder=6,
-                clip_on=False,
-            )
+        dx, dy = 4.0, 5.0
+        ha = "left"
+        if (x - x0) / xspan > 0.88:
+            dx, ha = -4.0, "right"
+        if (y - y0) / yspan > 0.90:
+            dy = -5.0
+        offsets[i] = (dx, dy)
+        has.append(ha)
+        t = ax.annotate(
+            str(lab),
+            (float(x), float(y)),
+            xytext=(float(dx), float(dy)),
+            textcoords="offset points",
+            fontsize=fontsize,
+            fontweight="bold",
+            ha=ha,
+            va="bottom" if dy >= 0 else "top",
+            color="0.1",
+            zorder=LABEL_ZORDER,
+            clip_on=False,
         )
-    # High min_arrow_len → no line for small moves; only far offsets get leaders
-    arrow = dict(arrowstyle="-", color="0.4", lw=0.45, alpha=0.85, shrinkA=0, shrinkB=2)
-    if HAS_ADJUST_TEXT and n > 0:
+        t.set_path_effects(_label_stroke())
+        texts.append(t)
+    try:
+        ax.figure.canvas.draw()
+        renderer = ax.figure.canvas.get_renderer()
+    except Exception:
+        return
+    for _ in range(50):
+        moved = False
+        bboxes = [t.get_window_extent(renderer).expanded(1.08, 1.18) for t in texts]
+        for i in range(n):
+            for j in range(i + 1, n):
+                if not bboxes[i].overlaps(bboxes[j]):
+                    continue
+                # Alternate push directions to reduce stacking
+                step = 2.8 if (j % 2 == 0) else -2.8
+                offsets[j, 0] += step
+                offsets[j, 1] += 3.2
+                texts[j].set_position((float(offsets[j, 0]), float(offsets[j, 1])))
+                moved = True
+        if not moved:
+            break
         try:
             ax.figure.canvas.draw()
+            renderer = ax.figure.canvas.get_renderer()
         except Exception:
-            pass
-        objs = []
-        if objects is not None:
-            objs = list(objects) if isinstance(objects, (list, tuple)) else [objects]
-        try:
-            adjust_text(
-                texts,
-                ax=ax,
-                objects=objs or None,
-                target_x=xs,
-                target_y=ys,
-                force_text=(0.8, 1.0),
-                force_static=(0.4, 0.5),
-                force_explode=(0.9, 1.1),
-                force_pull=(0.015, 0.015),
-                expand=(1.3, 1.45),
-                max_move=(25, 25),
-                ensure_inside_axes=True,
-                arrowprops=arrow,
-                min_arrow_len=12,  # only draw leader when far
-                iter_lim=700,
-            )
-            return
-        except Exception as exc:
-            print(f"[WARN] adjust_text failed: {exc}")
-    for txt in texts:
-        txt.set_visible(False)
-    base = [(8, 8), (-10, 8), (8, -10), (-10, -10), (12, 0), (-12, 0), (0, 12), (0, -12)]
-    for i, (x, y, lab) in enumerate(zip(xs, ys, labels)):
-        ox, oy = base[i % len(base)]
-        far = (ox * ox + oy * oy) ** 0.5 >= 12
-        ax.annotate(
-            str(lab), (x, y), xytext=(ox, oy), textcoords="offset points",
-            fontsize=fontsize, fontweight="bold", ha="center", va="center", color="0.15",
-            arrowprops=arrow if far else None, zorder=6, clip_on=False,
-        )
-
-
-def size_legend_handles(example_counts, cmin: float, cmax: float):
-    """True scatter sizes for legend; label with spacing so circles don't cover text."""
-    handles = []
-    for c in example_counts:
-        s = float(linear_point_sizes([c], cmin, cmax)[0])
-        h = plt.scatter(
-            [], [], s=s, c="0.45", alpha=MARKER_ALPHA,
-            edgecolors="none", label=f"  n≈{int(c):,}",
-        )
-        handles.append(h)
-    return handles
+            break
 
 
 def colour_legend_handles():
@@ -282,6 +268,31 @@ def colour_legend_handles():
         Patch(facecolor=COLOR_BELOW, edgecolor="none", label="Below diagonal (ICARE-GT < ICARE-GEN)"),
         Patch(facecolor=COLOR_ABOVE, edgecolor="none", label="Above diagonal (ICARE-GT > ICARE-GEN)"),
     ]
+
+
+def draw_booktabs_key(ax, names: Dict[int, str]) -> None:
+    """ID -> Cluster table: top/header/bottom rules only; fills panel height."""
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+    apply_spines(ax, style="none")
+    n_rows = 20
+    y_top, y_bot = 0.98, 0.02
+    row_h = (y_top - y_bot) / (n_rows + 1)
+    x_id, x_name = 0.08, 0.18
+    y_header = y_top - 0.5 * row_h
+    ax.text(x_id, y_header, "ID", fontsize=7, fontweight="bold", ha="center", va="center")
+    ax.text(x_name, y_header, "Cluster", fontsize=7, fontweight="bold", ha="left", va="center")
+    lw = 0.9
+    ax.plot([0.02, 0.98], [y_top, y_top], color="k", lw=lw, solid_capstyle="butt", clip_on=False)
+    y_mid = y_top - row_h
+    ax.plot([0.02, 0.98], [y_mid, y_mid], color="k", lw=0.7, solid_capstyle="butt", clip_on=False)
+    ax.plot([0.02, 0.98], [y_bot, y_bot], color="k", lw=lw, solid_capstyle="butt", clip_on=False)
+    for i in range(20):
+        y = y_top - (i + 1.5) * row_h
+        ax.text(x_id, y, str(i), fontsize=7, fontweight="bold", ha="center", va="center")
+        ax.text(x_name, y, names.get(i, ""), fontsize=7, fontweight="bold", ha="left", va="center")
+
 
 
 def save_fig(fig: plt.Figure, stem: Path) -> None:
@@ -301,26 +312,20 @@ def pooled_n_gt_exp5(exp5: Path) -> pd.DataFrame:
 
 
 
+
 def build_supp_fig_a(exp5: Path, names: Dict[int, str], out: Path) -> pd.DataFrame:
     summ = pd.read_csv(exp5 / "model_seeds_all" / "across_seed_summary.csv")
     pooled = pooled_n_gt_exp5(exp5)
     summ = summ.merge(pooled, on=["Model", "Cluster"], how="left")
-    counts = summ.pooled_n_gt.fillna(summ.mean_n_gt).to_numpy(dtype=float)
-    cmin, cmax = float(np.nanmin(counts)), float(np.nanmax(counts))
-    ex_counts = (
-        int(np.nanpercentile(counts, 15)),
-        int(np.nanpercentile(counts, 50)),
-        int(np.nanpercentile(counts, 90)),
-    )
 
-    # 2×2 at 180 mm; square plot panels
-    fig_h = FIG_W * 1.05
+    # 2x2 plot panels + legend row; extra vertical gap so (c) title clears row 1
+    fig_h = FIG_W * 1.12
     fig = plt.figure(figsize=(FIG_W, fig_h))
     gs = fig.add_gridspec(
         3, 2,
-        height_ratios=[1.0, 1.0, 0.22],
+        height_ratios=[1.0, 1.0, 0.16],
         width_ratios=[1.0, 1.0],
-        hspace=0.32,
+        hspace=0.42,
         wspace=0.28,
         figure=fig,
     )
@@ -334,22 +339,15 @@ def build_supp_fig_a(exp5: Path, names: Dict[int, str], out: Path) -> pd.DataFra
         xs = sub.GEN_mean.to_numpy(dtype=float)
         ys = sub.GT_mean.to_numpy(dtype=float)
         labs = [int(c) for c in sub.Cluster]
-        cnt = sub.pooled_n_gt.fillna(sub.mean_n_gt).to_numpy(dtype=float)
-        sizes = linear_point_sizes(cnt, cmin, cmax)
         colors = [side_color(side_of_diagonal(g, e)) for g, e in zip(ys, xs)]
 
-        # Markers first
-        sc = ax.scatter(
-            xs, ys, s=sizes, c=colors, alpha=MARKER_ALPHA,
-            edgecolors="none", zorder=3,
-        )
-        # Error bars on top of markers
+        # Error bars under markers (visible beyond marker radius)
         for _, r in sub.iterrows():
             side = side_of_diagonal(r.GT_mean, r.GEN_mean)
             ax.errorbar(
                 r.GEN_mean, r.GT_mean, xerr=r.GEN_sd, yerr=r.GT_sd,
-                fmt="none", ecolor=side_color(side), elinewidth=0.8,
-                capsize=1.6, alpha=0.95, zorder=10,
+                fmt="none", ecolor=side_color(side), elinewidth=0.85,
+                capsize=1.6, alpha=0.9, zorder=ERRORBAR_ZORDER,
             )
             source_rows.append(
                 {
@@ -363,49 +361,43 @@ def build_supp_fig_a(exp5: Path, names: Dict[int, str], out: Path) -> pd.DataFra
                     "ICARE_GT_sd": r.GT_sd,
                     "pooled_n_gt": float(r.pooled_n_gt) if pd.notna(r.pooled_n_gt) else float(r.mean_n_gt),
                     "side_of_diagonal": side,
-                    "marker_size_pt2": float(linear_point_sizes([r.pooled_n_gt if pd.notna(r.pooled_n_gt) else r.mean_n_gt], cmin, cmax)[0]),
+                    "marker_size_pt2": MARKER_SIZE_PT2,
                 }
             )
+
+        ax.scatter(
+            xs, ys, s=MARKER_SIZE_PT2, c=colors, alpha=MARKER_ALPHA,
+            edgecolors="none", zorder=MARKER_ZORDER,
+        )
         draw_diagonal(ax)
         apply_fig4_axes(ax)
-        ax.set_title(display(model), fontweight="bold", pad=6, fontsize=9)
+        ax.set_title(display(model), fontweight="bold", pad=8, fontsize=9)
         panel_letter_outside(ax, letters[i])
-        offset_cluster_labels(ax, xs, ys, labs, fontsize=7.0, objects=sc)
+        offset_cluster_labels(ax, xs, ys, labs, fontsize=7.0)
 
-    # (d) key table
+    # (d) booktabs key — same gridspec cell size as plot panels
     axd = fig.add_subplot(gs[1, 1])
-    axd.axis("off")
-    axd.text(-0.08, 1.04, "(d)", transform=axd.transAxes, fontsize=10, fontweight="bold",
-             va="bottom", ha="right", clip_on=False)
-    rows = [[str(cid), names.get(cid, "")] for cid in range(20)]
-    table = axd.table(
-        cellText=rows, colLabels=["ID", "Cluster name"], loc="center", cellLoc="left",
-        bbox=[0.0, 0.0, 1.0, 0.95], colWidths=[0.14, 0.86],
-    )
-    table.auto_set_font_size(False)
-    table.set_fontsize(7)
-    table.scale(1.0, 1.2)
-    for (row, col), cell in table.get_celld().items():
-        if row == 0:
-            cell.set_facecolor("#E6E6E6")
-            cell.set_text_props(weight="bold", fontsize=7)
-        else:
-            cell.set_text_props(weight="bold", fontsize=7)
-        if col == 0:
-            cell.get_text().set_ha("center")
+    panel_letter_outside(axd, "d")
+    draw_booktabs_key(axd, names)
 
-    # Legend row below panels (single row), not overlapping panel letters
-    leg_ax = fig.add_subplot(gs[2, :])
-    leg_ax.axis("off")
-    handles = colour_legend_handles() + size_legend_handles(ex_counts, cmin, cmax)
-    leg = leg_ax.legend(
-        handles=handles, loc="center", ncol=5, frameon=True, framealpha=0.95,
-        fontsize=7, handletextpad=0.6, columnspacing=1.4, borderpad=0.6,
-        title="Colour = side of diagonal; size ∝ pooled GT question count (linear, shared scale)",
-        title_fontsize=7,
+    # One-row legend below (do not add a data axis with ticks)
+    handles = colour_legend_handles()
+    err_proxy = Patch(facecolor="none", edgecolor="none", label="Error bars: SD across 5 evaluation seeds")
+    fig.legend(
+        handles=handles + [err_proxy],
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.01),
+        ncol=3,
+        frameon=True,
+        framealpha=0.95,
+        fontsize=7,
+        handletextpad=0.5,
+        columnspacing=1.2,
+        borderpad=0.5,
     )
 
-    fig.subplots_adjust(left=0.08, right=0.98, top=0.94, bottom=0.06)
+    fig.subplots_adjust(left=0.08, right=0.98, top=0.93, bottom=0.10)
+    print(f"Supp Fig A axes count: {len(fig.axes)}")
     save_fig(fig, out / "SuppFigA_exp5_seed_consistency")
     return pd.DataFrame(source_rows)
 
@@ -729,67 +721,47 @@ def concept_cluster_ids(exp4: Path) -> Dict[int, Dict[str, int]]:
 
 
 
+
 def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str], out: Path) -> Dict[str, pd.DataFrame]:
-    """5×3 Fig. 4-style grid; no outer frame; shared linear marker scale."""
+    """5x3 Fig. 4-style grid; uniform markers; only the 15 panel axes."""
     concept_ids = concept_cluster_ids(exp4)
-    # Shared count scale across all K × models
-    all_counts = []
-    scores_by_k = {}
-    for k in KS_GRID:
-        sk = load_scores(exp4, k)
-        scores_by_k[k] = sk
-        all_counts.append(sk.n_gt.to_numpy(dtype=float))
-    all_c = np.concatenate(all_counts)
-    cmin, cmax = float(np.nanmin(all_c)), float(np.nanmax(all_c))
-    ex_counts = (int(np.nanpercentile(all_c, 15)), int(np.nanpercentile(all_c, 50)), int(np.nanpercentile(all_c, 90)))
+    scores_by_k = {k: load_scores(exp4, k) for k in KS_GRID}
 
     fig = plt.figure(figsize=(FIG_W, FIG_B_H))
     nrows, ncols = len(KS_GRID), len(MODEL_ORDER)
-    # Single gridspec only — no host axes (avoids stray outer ticks)
-    gs = fig.add_gridspec(nrows, ncols, hspace=0.14, wspace=0.10, figure=fig)
-    ring = Line2D(
-        [0], [0], marker="o", color="w", markerfacecolor="none",
-        markeredgecolor="0.15", markeredgewidth=1.6, markersize=9,
-        label="Lung Lobe / Calcified Granuloma (best match)",
+    gs = fig.add_gridspec(
+        nrows, ncols, hspace=0.20, wspace=0.14, figure=fig,
+        left=0.10, right=0.985, top=0.90, bottom=0.055,
     )
-    handles = colour_legend_handles() + size_legend_handles(ex_counts, cmin, cmax) + [ring]
     fig.legend(
-        handles=handles, loc="upper center", bbox_to_anchor=(0.5, 1.0),
-        ncol=6, frameon=True, framealpha=0.95,
-        fontsize=6.5, handletextpad=0.5, columnspacing=1.1,
-        title="Colour = side of diagonal; size ∝ GT question count (linear, shared across panels)",
-        title_fontsize=7,
+        handles=colour_legend_handles(),
+        loc="upper center",
+        bbox_to_anchor=(0.55, 0.995),
+        ncol=2,
+        frameon=True,
+        framealpha=0.95,
+        fontsize=7,
+        handletextpad=0.5,
+        columnspacing=1.4,
+        borderpad=0.45,
     )
     source_d = []
 
     for ri, k in enumerate(KS_GRID):
         sk = scores_by_k[k]
         name_map = load_names(exp4, k)
-        highlight = set(concept_ids.get(k, {}).values())
         for ci, model in enumerate(MODEL_ORDER):
             ax = fig.add_subplot(gs[ri, ci])
             sub = sk[sk.Model == model].copy()
             xs = sub.GEN.to_numpy(dtype=float)
             ys = sub.GT.to_numpy(dtype=float)
             labs = [int(c) for c in sub.Cluster]
-            sizes = linear_point_sizes(sub.n_gt, cmin, cmax)
             colors = [side_color(side_of_diagonal(g, e)) for g, e in zip(ys, xs)]
 
-            sc = ax.scatter(
-                xs, ys, s=sizes, c=colors, alpha=MARKER_ALPHA,
-                edgecolors="none", zorder=3,
+            ax.scatter(
+                xs, ys, s=MARKER_SIZE_PT2, c=colors, alpha=MARKER_ALPHA,
+                edgecolors="none", zorder=MARKER_ZORDER,
             )
-            # Highlight rings (not black outline on every point)
-            if highlight:
-                hi_mask = np.array([lab in highlight for lab in labs], dtype=bool)
-                if hi_mask.any():
-                    ax.scatter(
-                        xs[hi_mask], ys[hi_mask],
-                        s=sizes[hi_mask] * 1.35,
-                        facecolors="none", edgecolors="0.1",
-                        linewidths=1.5, zorder=5,
-                    )
-
             draw_diagonal(ax)
             apply_fig4_axes(
                 ax,
@@ -798,11 +770,10 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                 show_xticklabels=(ri == nrows - 1),
                 show_yticklabels=(ci == 0),
             )
-            # Kill any residual ticks that could float into gutters
             ax.tick_params(which="both", top=False, right=False)
 
             offset_cluster_labels(
-                ax, xs, ys, labs, fontsize=6.5 if k >= 25 else 7.0, objects=[sc]
+                ax, xs, ys, labs, fontsize=6.5 if k >= 25 else 7.0
             )
 
             if ri == 0:
@@ -818,10 +789,7 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                 panel_letter_outside(ax, "a")
 
             if k == 20:
-                ax.set_facecolor("#f4f4f4")
-            apply_spines(ax, style="left_bottom")
-            # Clip artists to axes so nothing paints into gutters
-            ax.set_clip_on(True)
+                ax.set_facecolor("#eeeeee")
 
             for _, r in sub.iterrows():
                 side = side_of_diagonal(r.GT, r.GEN)
@@ -836,7 +804,7 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                         "n_gt": int(r.n_gt),
                         "n_gen": int(r.n_gen),
                         "side_of_diagonal": side,
-                        "marker_size_pt2": float(linear_point_sizes([r.n_gt], cmin, cmax)[0]),
+                        "marker_size_pt2": MARKER_SIZE_PT2,
                         "highlight_concept": next(
                             (c for c, cid in concept_ids.get(k, {}).items() if cid == int(r.Cluster)),
                             "",
@@ -844,15 +812,13 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                     }
                 )
 
-    fig.subplots_adjust(left=0.11, right=0.99, top=0.90, bottom=0.05)
-    # Final pass: lock limits/ticks/spines on every data panel
+    n_axes = len(fig.axes)
+    print(f"Supp Fig B axes count: {n_axes} (expected 15)")
+    if n_axes != 15:
+        print(f"[WARN] unexpected fig.axes count: {n_axes}")
     for ax in fig.axes:
-        if not ax.collections:
-            continue
         ax.set_xlim(*AX_LIM)
         ax.set_ylim(*AX_LIM)
-        ax.set_xticks([0.2, 0.4, 0.6, 0.8, 1.0])
-        ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
         apply_spines(ax, style="left_bottom")
         ax.tick_params(which="both", top=False, right=False)
     save_fig(fig, out / "SuppFigB_exp4_k_sensitivity")
@@ -1173,14 +1139,26 @@ def write_source_data(out: Path, sheets: Dict[str, pd.DataFrame]) -> None:
 
 
 
-def write_captions(out: Path) -> None:
-    text = """# Captions — R2 supplementary figures and tables (Exp 4–5)
 
-Data: IU X-ray; 590 reports per model. Evaluation uses five evaluation seeds with model seeds pooled as in Fig. 4. Side of the diagonal follows Fig. 4: below the diagonal = omission-dominated (ICARE-GT < ICARE-GEN); above the diagonal = hallucination-dominated (ICARE-GT > ICARE-GEN). K=20 was chosen with radiologists. Point size is a linear map of GT question count to marker area (shared scale per figure; ~10–250 pt²). Cluster point labels are IDs; names appear in key panels and tables.
+def write_captions(out: Path, concept_ids: Optional[Dict[int, Dict[str, int]]] = None) -> None:
+    concept_ids = concept_ids or {}
+    concept_lines = []
+    for k in KS_GRID:
+        ids = concept_ids.get(k, {})
+        lung = ids.get("Lung Lobe Abnormality", "NA")
+        calc = ids.get("Calcified Granuloma Location", "NA")
+        concept_lines.append(
+            f"- K = {k}: Lung Lobe Abnormality = cluster {lung}; "
+            f"Calcified Granuloma Location = cluster {calc}."
+        )
+    concept_block = "\n".join(concept_lines)
+    text = f"""# Captions — R2 supplementary figures and tables (Exp 4–5)
+
+Data: IU X-ray; 590 reports per model. Evaluation uses five evaluation seeds with model seeds pooled as in Fig. 4. Side of the diagonal follows Fig. 4: below the diagonal = omission-dominated (ICARE-GT < ICARE-GEN); above the diagonal = hallucination-dominated (ICARE-GT > ICARE-GEN). K=20 was chosen with radiologists. Markers are uniform in size (no size encoding); question counts are reported in Supplementary Tables A and B. Cluster point labels are IDs; names appear in key panels and tables.
 
 ## Supp Fig. A
 **Supplementary Figure A. Evaluation-seed consistency of ICARE cluster scores (K=20).**  
-(a–c) Across-seed mean ICARE-GEN (x) versus mean ICARE-GT (y) for CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC and MAIRA2. Error bars show the across-seed standard deviation over five evaluation seeds. Point size uses the pooled GT question count across all five seeds on a shared linear scale (~10–250 pt²); colour encodes side of the diagonal (red: below / omission-dominated; blue: above / hallucination-dominated). Points are labelled by K=20 cluster ID. The dashed line is the identity. (d) Cluster ID → name key (same as Fig. 4d).
+(a–c) Across-seed mean ICARE-GEN (x) versus mean ICARE-GT (y) for CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC and MAIRA2. Error bars show the across-seed standard deviation over five evaluation seeds. Colour encodes side of the diagonal (red: below / omission-dominated; blue: above / hallucination-dominated). Points are labelled by K=20 cluster ID. The dashed line is the identity. (d) Cluster ID → name key (same as Fig. 4d). Question counts are given in Supplementary Table A.
 
 ## Supp Table A
 **Supplementary Table A. Evaluation-seed consistency at K=20.**  
@@ -1188,7 +1166,10 @@ For each cluster and model: ICARE-GT and ICARE-GEN as across-seed mean ± SD, an
 
 ## Supp Fig. B
 **Supplementary Figure B. ICARE cluster scores across the number of clusters K (Fig. 4–style grid).**  
-Each panel is a Fig. 4–style scatterplot of ICARE-GEN (x) versus ICARE-GT (y) for one model at one K. Rows: K = 10, 15, 20, 25, 30 (the K=20 row is the Fig. 4 setting); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Point size uses a shared linear scale of GT question count (~10–250 pt²); colour encodes side of the diagonal; points are labelled by cluster ID. Clusters best-matching **Lung Lobe Abnormality** and **Calcified Granuloma Location** are highlighted with an open ring. Cluster ID → name keys for K ≠ 20 are in Supplementary Table C; the K=20 key is Fig. 4d / Supplementary Figure A(d).
+Each panel is a Fig. 4–style scatterplot of ICARE-GEN (x) versus ICARE-GT (y) for one model at one K. Rows: K = 10, 15, 20, 25, 30 (the K=20 row is the Fig. 4 setting, shown on a light grey background); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Markers are uniform in size; colour encodes side of the diagonal; points are labelled by cluster ID. Question counts are given in Supplementary Table B. Cluster ID → name keys for K ≠ 20 are in Supplementary Table C; the K=20 key is Fig. 4d / Supplementary Figure A(d).
+
+Best-matching cluster IDs for the tracked concepts:
+{concept_block}
 
 ## Supp Table B
 **Supplementary Table B. Sensitivity to K (Exp 4).**  
@@ -1196,7 +1177,7 @@ Part 1: for each K and model, counts and percentages of clusters below / above t
 
 ## Supp Table C
 **Supplementary Table C. Cluster keys for K = 10, 15, 25, 30.**  
-Cluster ID → best-matching K=20 cluster name and share. Local names are filled when `cluster_names_K{K}.json` is present (LLM naming can be applied later without recomputing scores). The K=20 name key is Fig. 4d.
+Cluster ID → best-matching K=20 cluster name and share. Local names are filled when `cluster_names_K{{K}}.json` is present (LLM naming can be applied later without recomputing scores). The K=20 name key is Fig. 4d.
 """
     (out / "captions.md").write_text(text)
     print(f"Wrote {out / 'captions.md'}")
@@ -1228,10 +1209,10 @@ def main() -> int:
         print(f"  {raw!r} → {disp!r}")
     print("Plot order:", [display(m) for m in MODEL_ORDER])
     print("=== Marker / layout settings ===")
-    print(f"  point size: linear [{SIZE_MIN_PT2:g}, {SIZE_MAX_PT2:g}] pt^2 shared per figure")
-    print(f"  alpha={MARKER_ALPHA}, edgecolors='none'")
+    print(f"  uniform marker size: {MARKER_SIZE_PT2:g} pt^2")
+    print(f"  alpha={MARKER_ALPHA}, edgecolors='none'; no size encoding")
     print(f"  diagonal: k--, lw={FIG4_DIAG_LW}, alpha={FIG4_DIAG_ALPHA}")
-    print(f"  spines=left+bottom; axes lim={AX_LIM}; adjustText={HAS_ADJUST_TEXT}")
+    print(f"  spines=left+bottom; axes lim={AX_LIM}")
     print("  model titles from MODEL_DISPLAY_NAMES; fonts >= 7 pt")
 
     setup_style()
@@ -1249,7 +1230,7 @@ def main() -> int:
     tab_b1, tab_b2 = build_supp_table_b(exp4, metrics, names20, out)
     tab_c = build_supp_table_c(exp4, names20, out)
 
-    write_captions(out)
+    write_captions(out, concept_cluster_ids(exp4))
     sheets = {
         "FigA_panels_abc": fig_a_src,
         "FigA_key": pd.DataFrame({"cluster_id": list(range(20)), "cluster_name": [names20.get(i, "") for i in range(20)]}),

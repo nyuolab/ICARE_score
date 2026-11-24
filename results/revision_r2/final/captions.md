@@ -1,10 +1,10 @@
 # Captions — R2 supplementary figures and tables (Exp 4–5)
 
-Data: IU X-ray; 590 reports per model. Evaluation uses five evaluation seeds with model seeds pooled as in Fig. 4. Side of the diagonal follows Fig. 4: below the diagonal = omission-dominated (ICARE-GT < ICARE-GEN); above the diagonal = hallucination-dominated (ICARE-GT > ICARE-GEN). K=20 was chosen with radiologists. Point size is a linear map of GT question count to marker area (shared scale per figure; ~10–250 pt²). Cluster point labels are IDs; names appear in key panels and tables.
+Data: IU X-ray; 590 reports per model. Evaluation uses five evaluation seeds with model seeds pooled as in Fig. 4. Side of the diagonal follows Fig. 4: below the diagonal = omission-dominated (ICARE-GT < ICARE-GEN); above the diagonal = hallucination-dominated (ICARE-GT > ICARE-GEN). K=20 was chosen with radiologists. Markers are uniform in size (no size encoding); question counts are reported in Supplementary Tables A and B. Cluster point labels are IDs; names appear in key panels and tables.
 
 ## Supp Fig. A
 **Supplementary Figure A. Evaluation-seed consistency of ICARE cluster scores (K=20).**  
-(a–c) Across-seed mean ICARE-GEN (x) versus mean ICARE-GT (y) for CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC and MAIRA2. Error bars show the across-seed standard deviation over five evaluation seeds. Point size uses the pooled GT question count across all five seeds on a shared linear scale (~10–250 pt²); colour encodes side of the diagonal (red: below / omission-dominated; blue: above / hallucination-dominated). Points are labelled by K=20 cluster ID. The dashed line is the identity. (d) Cluster ID → name key (same as Fig. 4d).
+(a–c) Across-seed mean ICARE-GEN (x) versus mean ICARE-GT (y) for CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC and MAIRA2. Error bars show the across-seed standard deviation over five evaluation seeds. Colour encodes side of the diagonal (red: below / omission-dominated; blue: above / hallucination-dominated). Points are labelled by K=20 cluster ID. The dashed line is the identity. (d) Cluster ID → name key (same as Fig. 4d). Question counts are given in Supplementary Table A.
 
 ## Supp Table A
 **Supplementary Table A. Evaluation-seed consistency at K=20.**  
@@ -12,7 +12,14 @@ For each cluster and model: ICARE-GT and ICARE-GEN as across-seed mean ± SD, an
 
 ## Supp Fig. B
 **Supplementary Figure B. ICARE cluster scores across the number of clusters K (Fig. 4–style grid).**  
-Each panel is a Fig. 4–style scatterplot of ICARE-GEN (x) versus ICARE-GT (y) for one model at one K. Rows: K = 10, 15, 20, 25, 30 (the K=20 row is the Fig. 4 setting); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Point size uses a shared linear scale of GT question count (~10–250 pt²); colour encodes side of the diagonal; points are labelled by cluster ID. Clusters best-matching **Lung Lobe Abnormality** and **Calcified Granuloma Location** are highlighted with an open ring. Cluster ID → name keys for K ≠ 20 are in Supplementary Table C; the K=20 key is Fig. 4d / Supplementary Figure A(d).
+Each panel is a Fig. 4–style scatterplot of ICARE-GEN (x) versus ICARE-GT (y) for one model at one K. Rows: K = 10, 15, 20, 25, 30 (the K=20 row is the Fig. 4 setting, shown on a light grey background); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Markers are uniform in size; colour encodes side of the diagonal; points are labelled by cluster ID. Question counts are given in Supplementary Table B. Cluster ID → name keys for K ≠ 20 are in Supplementary Table C; the K=20 key is Fig. 4d / Supplementary Figure A(d).
+
+Best-matching cluster IDs for the tracked concepts:
+- K = 10: Lung Lobe Abnormality = cluster 5; Calcified Granuloma Location = cluster 3.
+- K = 15: Lung Lobe Abnormality = cluster 9; Calcified Granuloma Location = cluster 13.
+- K = 20: Lung Lobe Abnormality = cluster 12; Calcified Granuloma Location = cluster 13.
+- K = 25: Lung Lobe Abnormality = cluster 14; Calcified Granuloma Location = cluster 4.
+- K = 30: Lung Lobe Abnormality = cluster 5; Calcified Granuloma Location = cluster 13.
 
 ## Supp Table B
 **Supplementary Table B. Sensitivity to K (Exp 4).**  
