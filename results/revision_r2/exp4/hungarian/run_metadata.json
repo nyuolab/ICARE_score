@@ -1,0 +1,37 @@
+{
+  "commit": "0f92468fa787197a9c5a0466f97393931d9e7254",
+  "timestamp_utc": "2026-11-25T20:31:14.978664+00:00",
+  "command": "cd /gpfs/data/oermannlab/users/rd3571/ICARE_score_rev_stats && srun --partition=oermannlab --nodes=1 --ntasks=1 --cpus-per-task=4 --mem=32G --time=00:30:00 --job-name=exp4-hungarian /gpfs/data/oermannlab/users/rd3571/.conda/envs/radeval311/bin/python src/question_categorization_and_analysis/cluster_k_hungarian.py",
+  "input_paths": {
+    "clustered_questions": "/gpfs/data/oermannlab/users/rd3571/ICARE_score_rev_stats/results/revision_r2/exp4/model_seeds_all/clustered_questions_K{K}.csv",
+    "scores": "/gpfs/data/oermannlab/users/rd3571/ICARE_score_rev_stats/results/revision_r2/exp4/model_seeds_all/scores_K{K}.csv",
+    "names": "/gpfs/data/oermannlab/users/rd3571/ICARE_score_rev_stats/results/revision_r2/exp4/model_seeds_all/cluster_names_K20.json",
+    "table_d": "/gpfs/data/oermannlab/users/rd3571/ICARE_score_rev_stats/results/revision_r2/final/SuppTableD_concept_consistency_by_K.csv"
+  },
+  "flow_cross_check": {
+    "K10": {
+      "match": true,
+      "n_disagree": 0
+    },
+    "K15": {
+      "match": true,
+      "n_disagree": 0
+    },
+    "K25": {
+      "match": true,
+      "n_disagree": 0
+    },
+    "K30": {
+      "match": true,
+      "n_disagree": 0
+    }
+  },
+  "flow_all_match": true,
+  "summary": [
+    "Hungarian % same-side as K=20 \u2014 CheXpertPlus_MIMIC: K10=75%, K15=85%, K20=100%, K25=80%, K30=95%; CheXpertPlus_Chex_MIMIC: K10=80%, K15=75%, K20=100%, K25=70%, K30=80%; MAIRA2: K10=90%, K15=95%, K20=100%, K25=90%, K30=90%.",
+    "Side cells differing from current Table D: 5; main-id differing from greedy best-match: 4.",
+    "networkx.min_cost_flow cross-check matches Hungarian for all K: True."
+  ],
+  "M_required": 1000000000.0,
+  "weak_jaccard_threshold": 0.5
+}

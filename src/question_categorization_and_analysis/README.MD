@@ -61,3 +61,16 @@ sbatch scripts/iuxray_data/question_categorization_and_analysis/cluster_analysis
 Modify the OUTPUT_DIR and BASE_DIR or other information in these scripts before running them. 
 The results can be seen at the ${OUTPUT_DIR}/analysis/all_models_gt_vs_gen_agreement.png
 
+
+## Exp4 Hungarian K-mapping (R2 follow-up)
+
+Map clusters at K = 10, 15, 25, 30 to the K = 20 (Fig. 4) clustering with a
+one-to-many / many-to-one Hungarian assignment. Does not re-embed or re-cluster.
+Writes only under `results/revision_r2/exp4/hungarian/`.
+
+```bash
+cd /gpfs/data/oermannlab/users/rd3571/ICARE_score_rev_stats
+srun --partition=oermannlab --nodes=1 --ntasks=1 --cpus-per-task=4 --mem=32G --time=00:30:00 --job-name=exp4-hungarian \
+  /gpfs/data/oermannlab/users/rd3571/.conda/envs/radeval311/bin/python \
+  src/question_categorization_and_analysis/cluster_k_hungarian.py
+```

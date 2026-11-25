@@ -1,0 +1,9 @@
+# Exp4 Hungarian cluster mapping
+
+Maps K∈{10,15,25,30} to K=20 (Fig. 4) with `scipy.optimize.linear_sum_assignment` (required + optional column copies) and cross-checks with `networkx.min_cost_flow` (required edge capacity 1 per receiving cluster).
+
+## Exact command
+
+```bash
+cd /gpfs/data/oermannlab/users/rd3571/ICARE_score_rev_stats && srun --partition=oermannlab --nodes=1 --ntasks=1 --cpus-per-task=4 --mem=32G --time=00:30:00 --job-name=exp4-hungarian /gpfs/data/oermannlab/users/rd3571/.conda/envs/radeval311/bin/python src/question_categorization_and_analysis/cluster_k_hungarian.py
+```

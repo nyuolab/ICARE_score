@@ -1,0 +1,6 @@
+concept_id,concept_name,model,K,tableD_cell,hungarian_cell,hungarian_main_id
+2,Pleural Fluid Presence,CheXpertPlus_MIMIC,30,Below*,Above§,2
+2,Pleural Fluid Presence,CheXpertPlus_Chex_MIMIC,30,Above*,Below§,2
+11,Surgical Clip Location,MAIRA2,25,Below*,Above§,23
+17,Lung Clearness and Normalcy,MAIRA2,15,Below*†,Above§,8
+17,Lung Clearness and Normalcy,MAIRA2,25,Below*†,Above§,17
