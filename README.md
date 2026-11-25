@@ -211,6 +211,8 @@ Purpose: Exp 4 (cluster *K* sensitivity) and Exp 5 (eval-seed consistency) on th
 **Inputs (read-only):**  
 `/gpfs/data/oermannlab/users/rd3571/RRG_evaluation/MCQ_generation/MCQ_gen_data_our_eval_summarized_results/IU_xray/question_categorization_and_analysis/`
 
+**Exp 3 (R1-C4):** Fig. 2a–style score-gap quintile triptych on RadPref and ReXVal (figures only) → `results/revision_r2/exp3/` via `python scripts/clinical_stats/run_exp3_score_gap.py` on `cpu_short`.
+
 **Outputs:** `results/revision_r2/exp4/` and `results/revision_r2/exp5/` with `model_seeds_all/` (primary) and `model_seed_1/` subdirectories. Summaries + figures are committed; large CSVs / `.npy` / assignments are gitignored.
 
 **Final supplement (from existing outputs only):** `python src/question_categorization_and_analysis/make_r2_supp_figures.py` → `results/revision_r2/final/` (Supp Fig. A–B, Tables A–C, Source Data, captions).

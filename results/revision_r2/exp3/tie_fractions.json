@@ -1,0 +1,18 @@
+{
+  "radpref": {
+    "n_rows": 3000,
+    "doctor_tie_fraction": 0.23,
+    "metric_tie_fraction": 0.031,
+    "n_doctor_ties": 69,
+    "n_metric_ties": 93,
+    "n_doctor_rows": 300
+  },
+  "rexval": {
+    "n_rows": 18000,
+    "doctor_tie_fraction": 0.544444,
+    "metric_tie_fraction": 0.214333,
+    "n_doctor_ties": 980,
+    "n_metric_ties": 3858,
+    "n_doctor_rows": 1800
+  }
+}
