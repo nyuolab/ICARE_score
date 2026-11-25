@@ -279,11 +279,13 @@ def draw_fig4_table(ax, names: Dict[int, str]) -> None:
         cell.PAD = 0.1
 
 
-def scatter_fig4(ax, xs, ys, counts, colors):
+def scatter_fig4(
+    ax, xs, ys, counts, colors, *, edgecolors=MARKER_EDGECOLOR, linewidths=MARKER_EDGEWIDTH
+):
     sizes = fig4_point_sizes(counts)
     ax.scatter(
         xs, ys, s=sizes, c=colors, alpha=MARKER_ALPHA,
-        edgecolors=MARKER_EDGECOLOR, linewidths=MARKER_EDGEWIDTH, zorder=MARKER_ZORDER,
+        edgecolors=edgecolors, linewidths=linewidths, zorder=MARKER_ZORDER,
     )
 
 
@@ -712,22 +714,7 @@ def build_exp4_metrics(exp4: Path) -> pd.DataFrame:
 
 
 
-# Fig. 4 / K=20 IDs for the two tracked concepts
-CONCEPT_K20_IDS = {
-    "Lung Lobe Abnormality": 12,
-    "Calcified Granuloma Location": 13,
-}
-HIGHLIGHT_EDGEWIDTH = 2.5
-HIGHLIGHT_HALO_COLOR = "#FFD54F"
-HIGHLIGHT_HALO_ALPHA = 0.6
-HIGHLIGHT_HALO_SCALE = 2.4  # area scale vs marker
-HALO_ZORDER = MARKER_ZORDER - 0.5
-HIGHLIGHT_ZORDER = MARKER_ZORDER + 0.5
-TAG_ZORDER = LABEL_ZORDER + 1
-TAG_FONTSIZE = 22  # match axis-label fontsize
-AXIS_LABEL_FONTSIZE = 22
-
-
+# Correspondence-based concept matching (all K=20 concepts)
 def k20_unique_cluster_sizes(exp4: Path) -> Dict[int, float]:
     """Unique-question counts per K=20 cluster (correspondence unit)."""
     p = exp4 / "model_seeds_all" / "clustered_questions_K20.csv"
@@ -742,15 +729,14 @@ def k20_unique_cluster_sizes(exp4: Path) -> Dict[int, float]:
     return {int(k): float(v) for k, v in sizes.items()}
 
 
-def concept_match_info(exp4: Path) -> Dict[int, Dict[str, dict]]:
-    """Per K: best-matching new cluster for each tracked K=20 concept.
+def all_concept_match_info(exp4: Path) -> Dict[int, Dict[int, dict]]:
+    """Per K and K=20 concept ID: best-matching new cluster + forward/reverse shares.
 
-    Matching uses existing correspondence matrices (forward share of the
-    concept's unique questions). Reverse share = fraction of the new
-    cluster that comes from that concept.
+    Forward = share of the concept's unique questions in the best new cluster.
+    Reverse = share of that new cluster's unique questions from the concept.
     """
     sizes20 = k20_unique_cluster_sizes(exp4)
-    out: Dict[int, Dict[str, dict]] = {}
+    out: Dict[int, Dict[int, dict]] = {}
     for k in KS_GRID:
         mat = load_correspondence(exp4, k)
         n_new = mat.shape[1]
@@ -758,7 +744,7 @@ def concept_match_info(exp4: Path) -> Dict[int, Dict[str, dict]]:
         for oid in range(20):
             size_new += mat[oid] * float(sizes20.get(oid, 0.0))
         out[k] = {}
-        for concept, oid in CONCEPT_K20_IDS.items():
+        for oid in range(20):
             best = int(np.argmax(mat[oid]))
             fwd = float(mat[oid, best])
             denom = float(size_new[best])
@@ -767,7 +753,7 @@ def concept_match_info(exp4: Path) -> Dict[int, Dict[str, dict]]:
                 if denom > 0
                 else float("nan")
             )
-            out[k][concept] = {
+            out[k][oid] = {
                 "cluster_id": best,
                 "forward": fwd,
                 "reverse": rev,
@@ -775,8 +761,33 @@ def concept_match_info(exp4: Path) -> Dict[int, Dict[str, dict]]:
     return out
 
 
+def concept_match_info(exp4: Path) -> Dict[int, Dict[str, dict]]:
+    """Legacy name-keyed view for Lung Lobe / Calcified Granuloma (Table B)."""
+    names20 = load_names(exp4, 20)
+    id_info = all_concept_match_info(exp4)
+    name_of = {int(i): names20.get(int(i), str(i)) for i in range(20)}
+    # invert: known Fig. 4 IDs
+    want = {
+        "Lung Lobe Abnormality": 12,
+        "Calcified Granuloma Location": 13,
+    }
+    out: Dict[int, Dict[str, dict]] = {}
+    for k in KS_GRID:
+        out[k] = {}
+        for concept, oid in want.items():
+            d = id_info[k][oid]
+            out[k][concept] = {
+                "cluster_id": d["cluster_id"],
+                "forward": d["forward"],
+                "reverse": d["reverse"],
+                "k20_id": oid,
+                "k20_name": name_of.get(oid, concept),
+            }
+    return out
+
+
 def concept_cluster_ids(exp4: Path) -> Dict[int, Dict[str, int]]:
-    """K -> {concept: matched cluster_id} for captions / highlights."""
+    """K -> {concept: matched cluster_id}."""
     info = concept_match_info(exp4)
     return {
         k: {c: int(d["cluster_id"]) for c, d in concepts.items()}
@@ -784,20 +795,8 @@ def concept_cluster_ids(exp4: Path) -> Dict[int, Dict[str, int]]:
     }
 
 
-def concept_tag_for(k: int, concept: str, reverse: float) -> str:
-    """Short bold tag; CG* when the concept is a minority of its matched cluster."""
-    if concept == "Lung Lobe Abnormality":
-        return "LL"
-    if concept == "Calcified Granuloma Location":
-        if k == 10 or (np.isfinite(reverse) and reverse < 0.5):
-            return "CG*"
-        return "CG"
-    return ""
-
-
 def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str], out: Path) -> Dict[str, pd.DataFrame]:
-    """5x3 grid; each panel uses Fig. 4 panel size and scatter style."""
-    match_info = concept_match_info(exp4)
+    """5x3 grid; each panel uses Fig. 4 panel size and scatter style (no edges/highlights)."""
     scores_by_k = {k: load_scores(exp4, k) for k in KS_GRID}
 
     nrows, ncols = len(KS_GRID), len(MODEL_ORDER)
@@ -815,55 +814,21 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
         top=0.95,
         bottom=0.03,
     )
-    below_handle = Patch(
-        facecolor=COLOR_BELOW,
-        edgecolor=MARKER_EDGECOLOR,
-        linewidth=MARKER_EDGEWIDTH,
-        label="Below diagonal (ICARE-GT < ICARE-GEN)",
-    )
-    above_handle = Patch(
-        facecolor=COLOR_ABOVE,
-        edgecolor=MARKER_EDGECOLOR,
-        linewidth=MARKER_EDGEWIDTH,
-        label="Above diagonal (ICARE-GT > ICARE-GEN)",
-    )
-    halo_handle = Line2D(
-        [0],
-        [0],
-        linestyle="None",
-        marker="o",
-        markersize=16,
-        markerfacecolor=HIGHLIGHT_HALO_COLOR,
-        markeredgecolor="black",
-        markeredgewidth=HIGHLIGHT_EDGEWIDTH,
-        alpha=HIGHLIGHT_HALO_ALPHA,
-        label=(
-            "Tracked concept (LL = Lung Lobe Abnormality; "
-            "CG = Calcified Granuloma Location; * = merged into a broader cluster)"
-        ),
-    )
     fig.legend(
-        handles=[below_handle, above_handle, halo_handle],
+        handles=colour_legend_handles(),
         loc="upper center",
         bbox_to_anchor=(0.5, 0.995),
-        ncol=3,
+        ncol=2,
         frameon=True,
-        fontsize=AXIS_LABEL_FONTSIZE,
+        fontsize=16,
         handletextpad=0.5,
-        columnspacing=1.0,
+        columnspacing=1.5,
     )
     source_d = []
 
     for ri, k in enumerate(KS_GRID):
         sk = scores_by_k[k]
         name_map = load_names(exp4, k)
-        k_info = match_info.get(k, {})
-        id_to_tags: Dict[int, List[str]] = {}
-        for concept, info in k_info.items():
-            cid = int(info["cluster_id"])
-            tag = concept_tag_for(k, concept, float(info["reverse"]))
-            id_to_tags.setdefault(cid, []).append(tag)
-
         for ci, model in enumerate(MODEL_ORDER):
             ax = fig.add_subplot(gs[ri, ci])
             sub = sk[sk.Model == model].copy()
@@ -873,47 +838,7 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
             cnt = sub.n_gt.to_numpy(dtype=float)
             colors = [side_color(side_of_diagonal(g, e)) for g, e in zip(ys, xs)]
 
-            scatter_fig4(ax, xs, ys, cnt, colors)
-            # Soft yellow halo behind marker + bold black outline; tags beside point
-            for x, y, lab, n in zip(xs, ys, labs, cnt):
-                if int(lab) not in id_to_tags:
-                    continue
-                if not (np.isfinite(x) and np.isfinite(y)):
-                    continue
-                s = float(fig4_point_sizes([n])[0])
-                ax.scatter(
-                    [float(x)],
-                    [float(y)],
-                    s=[s * HIGHLIGHT_HALO_SCALE],
-                    c=[HIGHLIGHT_HALO_COLOR],
-                    alpha=HIGHLIGHT_HALO_ALPHA,
-                    edgecolors="none",
-                    linewidths=0,
-                    zorder=HALO_ZORDER,
-                )
-                ax.scatter(
-                    [float(x)],
-                    [float(y)],
-                    s=[s],
-                    facecolors="none",
-                    edgecolors="black",
-                    linewidths=HIGHLIGHT_EDGEWIDTH,
-                    zorder=HIGHLIGHT_ZORDER,
-                )
-                tag = "/".join(id_to_tags[int(lab)])
-                ax.annotate(
-                    tag,
-                    (float(x), float(y)),
-                    xytext=(12, 0),
-                    textcoords="offset points",
-                    fontsize=TAG_FONTSIZE,
-                    weight="bold",
-                    ha="left",
-                    va="center",
-                    color="black",
-                    zorder=TAG_ZORDER,
-                    clip_on=False,
-                )
+            scatter_fig4(ax, xs, ys, cnt, colors, edgecolors="none", linewidths=0)
             label_clusters_fig4(ax, xs, ys, labs)
             draw_fig4_diagonal(ax)
             style_fig4_axes(
@@ -956,15 +881,6 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                         "n_gen": int(r.n_gen),
                         "side_of_diagonal": side,
                         "marker_size_pt2": float(fig4_point_sizes([r.n_gt])[0]),
-                        "highlight_concept": next(
-                            (
-                                c
-                                for c, info in k_info.items()
-                                if int(info["cluster_id"]) == int(r.Cluster)
-                            ),
-                            "",
-                        ),
-                        "highlight_tag": "/".join(id_to_tags.get(int(r.Cluster), [])),
                     }
                 )
 
@@ -982,6 +898,237 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
         "fig_b": metrics[["K", "model_display", "label_agreement_pct"]].copy(),
         "fig_c": metrics[["K", "model_display", "spearman_ICARE_GT", "spearman_ICARE_GEN"]].copy(),
     }
+
+
+
+def build_concept_consistency_table(
+    exp4: Path, names20: Dict[int, str], out: Path
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Concept-level consistency across K: side of diagonal for best-matching clusters.
+
+    Returns (display_wide-ish long source, long source with shares).
+    """
+    match = all_concept_match_info(exp4)
+    scores_by_k = {k: load_scores(exp4, k) for k in KS_GRID}
+    shade = {"below": "red!15", "above": "blue!15", "on": "gray!10"}
+
+    long_rows = []
+    for oid in range(20):
+        cname = names20.get(oid, str(oid))
+        for model in MODEL_ORDER:
+            # K=20 reference side
+            sk20 = scores_by_k[20]
+            cid20 = int(match[20][oid]["cluster_id"])
+            sc20 = sk20[(sk20.Model == model) & (sk20.Cluster == cid20)]
+            if sc20.empty:
+                side20 = "undefined"
+                gt20 = gen20 = float("nan")
+            else:
+                r20 = sc20.iloc[0]
+                side20 = side_of_diagonal(float(r20.GT), float(r20.GEN))
+                gt20, gen20 = float(r20.GT), float(r20.GEN)
+
+            for k in KS_GRID:
+                info = match[k][oid]
+                cid = int(info["cluster_id"])
+                fwd = float(info["forward"])
+                rev = float(info["reverse"])
+                sk = scores_by_k[k]
+                sc = sk[(sk.Model == model) & (sk.Cluster == cid)]
+                if sc.empty:
+                    side = "undefined"
+                    gt = gen = float("nan")
+                else:
+                    r = sc.iloc[0]
+                    side = side_of_diagonal(float(r.GT), float(r.GEN))
+                    gt, gen = float(r.GT), float(r.GEN)
+                merged = bool(np.isfinite(rev) and rev < 0.5)
+                split = bool(np.isfinite(fwd) and fwd < 0.5)
+                lab = {"below": "Below", "above": "Above", "on": "On", "undefined": "—"}.get(
+                    side, "—"
+                )
+                marks = ""
+                if merged:
+                    marks += "*"
+                if split:
+                    marks += r"†"
+                cell = lab + marks
+                long_rows.append(
+                    {
+                        "concept_id": oid,
+                        "concept_name": cname,
+                        "model": display(model),
+                        "model_raw": model,
+                        "K": k,
+                        "matched_cluster_id": cid,
+                        "side": side,
+                        "side_label": lab,
+                        "cell": cell,
+                        "forward_share": fwd,
+                        "reverse_share": rev,
+                        "merged_star": merged,
+                        "split_dagger": split,
+                        "ICARE_GT": gt,
+                        "ICARE_GEN": gen,
+                        "side_at_K20": side20,
+                        "same_side_as_K20": side == side20 and side in ("below", "above", "on"),
+                    }
+                )
+
+    long_df = pd.DataFrame(long_rows)
+
+    # Bottom-row agreement %
+    agree_rows = []
+    for model in MODEL_ORDER:
+        for k in KS_GRID:
+            sub = long_df[(long_df.model_raw == model) & (long_df.K == k)]
+            # only concepts with defined sides at both
+            ok = sub[
+                sub.side.isin(["below", "above", "on"])
+                & sub.side_at_K20.isin(["below", "above", "on"])
+            ]
+            pct = 100.0 * float((ok.side == ok.side_at_K20).mean()) if len(ok) else float("nan")
+            agree_rows.append(
+                {
+                    "concept_id": -1,
+                    "concept_name": "% same side as K=20",
+                    "model": display(model),
+                    "model_raw": model,
+                    "K": k,
+                    "matched_cluster_id": -1,
+                    "side": "",
+                    "side_label": "",
+                    "cell": f"{pct:.0f}%",
+                    "forward_share": float("nan"),
+                    "reverse_share": float("nan"),
+                    "merged_star": False,
+                    "split_dagger": False,
+                    "ICARE_GT": float("nan"),
+                    "ICARE_GEN": float("nan"),
+                    "side_at_K20": "",
+                    "same_side_as_K20": False,
+                    "pct_same_side_as_K20": pct,
+                }
+            )
+    agree_df = pd.DataFrame(agree_rows)
+    source = pd.concat([long_df, agree_df], ignore_index=True)
+    source.to_csv(out / "SuppTableD_concept_consistency_by_K_source.csv", index=False)
+
+    # Wide display CSV: concept_id, concept_name, then model|K columns
+    wide_rows = []
+    for oid in range(20):
+        row = {"concept_id": oid, "concept_name": names20.get(oid, str(oid))}
+        for model in MODEL_ORDER:
+            md = display(model)
+            for k in KS_GRID:
+                cell = long_df[
+                    (long_df.concept_id == oid)
+                    & (long_df.model_raw == model)
+                    & (long_df.K == k)
+                ].iloc[0].cell
+                row[f"{md} | K={k}"] = cell
+        wide_rows.append(row)
+    # agreement row
+    agree_wide = {"concept_id": "", "concept_name": "% same side as K=20"}
+    for model in MODEL_ORDER:
+        md = display(model)
+        for k in KS_GRID:
+            pct = agree_df[(agree_df.model_raw == model) & (agree_df.K == k)].iloc[0][
+                "pct_same_side_as_K20"
+            ]
+            agree_wide[f"{md} | K={k}"] = f"{pct:.0f}%"
+    wide_rows.append(agree_wide)
+    wide = pd.DataFrame(wide_rows)
+    wide.to_csv(out / "SuppTableD_concept_consistency_by_K.csv", index=False)
+
+    # LaTeX landscape booktabs one-page
+    # Use short model headers
+    short = {
+        display(MODEL_ORDER[0]): "CheX+MIMIC",
+        display(MODEL_ORDER[1]): "CheX+Chex+MIMIC",
+        display(MODEL_ORDER[2]): "MAIRA2",
+    }
+    lines = [
+        r"% Supp Table D — Concept-level consistency across K",
+        r"\begin{landscape}",
+        r"\begin{table}[p]",
+        r"\centering",
+        r"\footnotesize",
+        r"\setlength{\tabcolsep}{3pt}",
+        r"\caption{Concept-level consistency across $K$.}",
+        r"\label{tab:supp_concept_consistency_k}",
+        r"\begin{tabular}{rl" + ("ccccc" * len(MODEL_ORDER)) + "}",
+        r"\toprule",
+    ]
+    # header row 1: model spans
+    h1 = [r"ID", r"Concept"]
+    for model in MODEL_ORDER:
+        h1.append(r"\multicolumn{5}{c}{" + _tex(short[display(model)]) + r"}")
+    lines.append(" & ".join(h1) + r" \\")
+    # cmidrules
+    col = 3
+    cmids = []
+    for _ in MODEL_ORDER:
+        cmids.append(rf"\cmidrule(lr){{{col}-{col+4}}}")
+        col += 5
+    lines.append(" ".join(cmids))
+    # header row 2: K
+    h2 = ["", ""]
+    for _ in MODEL_ORDER:
+        for k in KS_GRID:
+            h2.append(str(k))
+    lines.append(" & ".join(h2) + r" \\")
+    lines.append(r"\midrule")
+
+    def cell_tex(side: str, cell: str) -> str:
+        # CSV keeps * / †; LaTeX uses math superscripts
+        tex_cell = (
+            cell.replace("*†", r"$^{\ast\dagger}$")
+            .replace("†", r"$^{\dagger}$")
+            .replace("*", r"$^{\ast}$")
+        )
+        if side not in shade:
+            return tex_cell
+        return r"\cellcolor{" + shade[side] + r"}" + tex_cell
+
+    for oid in range(20):
+        cname = names20.get(oid, str(oid))
+        parts = [str(oid), _tex(cname)[:28]]
+        for model in MODEL_ORDER:
+            for k in KS_GRID:
+                r = long_df[
+                    (long_df.concept_id == oid)
+                    & (long_df.model_raw == model)
+                    & (long_df.K == k)
+                ].iloc[0]
+                parts.append(cell_tex(r.side, r.cell))
+        lines.append(" & ".join(parts) + r" \\")
+    lines.append(r"\midrule")
+    parts = ["", r"\% same side as $K$=20"]
+    for model in MODEL_ORDER:
+        for k in KS_GRID:
+            pct = agree_df[(agree_df.model_raw == model) & (agree_df.K == k)].iloc[0][
+                "pct_same_side_as_K20"
+            ]
+            parts.append(f"{pct:.0f}\\%")
+    lines.append(" & ".join(parts) + r" \\")
+    lines += [
+        r"\bottomrule",
+        r"\end{tabular}",
+        r"\begin{flushleft}\footnotesize "
+        r"Concepts matched across $K$ by shared questions. "
+        r"$^\ast$ merged into a broader cluster; "
+        r"$^\dagger$ split across clusters. "
+        r"Cell colour: light red = Below diagonal (ICARE-GT $<$ ICARE-GEN); "
+        r"light blue = Above diagonal."
+        r"\end{flushleft}",
+        r"\end{table}",
+        r"\end{landscape}",
+        "",
+    ]
+    (out / "SuppTableD_concept_consistency_by_K.tex").write_text("\n".join(lines))
+    print(f"Wrote SuppTableD → {out}")
+    return wide, source
 
 
 def build_supp_table_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str], out: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -1308,7 +1455,7 @@ def write_captions(out: Path, concept_ids: Optional[Dict[int, Dict[str, int]]] =
     concept_block = "\n".join(concept_lines)
     text = f"""# Captions — R2 supplementary figures and tables (Exp 4–5)
 
-Data: IU X-ray; 590 reports per model. Evaluation uses five evaluation seeds with model seeds pooled as in Fig. 4. Side of the diagonal follows Fig. 4: below the diagonal = omission-dominated (ICARE-GT < ICARE-GEN); above the diagonal = hallucination-dominated (ICARE-GT > ICARE-GEN). K=20 was chosen with radiologists. Point style matches submitted Fig. 4 (`cluster_analysis.create_cluster_summary_table_and_scatterplots`): marker area = GT question count / 30, black edges, ID labels offset (5, 5) pt. Colour encodes side of the diagonal (the only intentional style difference from Fig. 4). Question counts are also reported in Supplementary Tables A and B.
+Data: IU X-ray; 590 reports per model. Evaluation uses five evaluation seeds with model seeds pooled as in Fig. 4. Side of the diagonal follows Fig. 4: below the diagonal = omission-dominated (ICARE-GT < ICARE-GEN); above the diagonal = hallucination-dominated (ICARE-GT > ICARE-GEN). K=20 was chosen with radiologists. Point style matches submitted Fig. 4 (`cluster_analysis.create_cluster_summary_table_and_scatterplots`): marker area = GT question count / 30, ID labels offset (5, 5) pt. Colour encodes side of the diagonal (an intentional style difference from Fig. 4). Supp Fig. A retains black marker edges; Supp Fig. B uses no marker edges. Question counts are also reported in Supplementary Tables A and B.
 
 ## Supp Fig. A
 **Supplementary Figure A. Evaluation-seed consistency of ICARE cluster scores (K=20).**  
@@ -1320,14 +1467,15 @@ For each cluster and model: ICARE-GT and ICARE-GEN as across-seed mean ± SD, an
 
 ## Supp Fig. B
 **Supplementary Figure B. ICARE cluster scores across the number of clusters K (Fig. 4–style grid).**  
-Each panel matches the submitted Fig. 4 scatter style. Rows: K = 10, 15, 20, 25, 30 (K=20 labelled Fig. 4); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Point size = GT question count / 30; colour encodes side of the diagonal. Tracked concepts were matched across K by shared questions: at each K, the highlighted cluster is the one containing the largest share of the questions in the corresponding K = 20 cluster (Fig. 4: cluster 12, Lung Lobe Abnormality; cluster 13, Calcified Granuloma Location). Cluster IDs are specific to each K.
-
-Best-matching cluster IDs for the tracked concepts:
-{concept_block}
+Each panel matches the submitted Fig. 4 scatter style (marker area = GT question count / 30; ID labels offset (5, 5) pt) without marker edge lines. Rows: K = 10, 15, 20, 25, 30 (K=20 labelled Fig. 4); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Colour encodes side of the diagonal. Cluster IDs are specific to each K.
 
 ## Supp Table B
 **Supplementary Table B. Sensitivity to K (Exp 4).**  
 Part 1: for each K and model, counts and percentages of clusters below / above the diagonal, label agreement with K=20 (%), and Spearman correlations for ICARE-GT and ICARE-GEN. Part 2: Lung Lobe Abnormality and Calcified Granuloma Location tracking.
+
+## Supp Table D
+**Supplementary Table D. Concept-level consistency across K.**  
+For each of the 20 K=20 concepts (Fig. 4d) and each model, cells give the side of the diagonal (Below / Above) of the cluster at K ∈ {10, 15, 20, 25, 30} that contains the largest share of that concept’s K=20 questions. Light red = Below (ICARE-GT < ICARE-GEN); light blue = Above. * merged into a broader cluster (concept < 50% of the matched cluster); † split (matched cluster holds < 50% of the concept’s questions). Bottom row: % of the 20 concepts on the same side of the diagonal as at K=20. Concepts matched across K by shared questions.
 
 ## Supp Table C
 **Supplementary Table C. Cluster keys for K = 10, 15, 25, 30.**  
@@ -1384,6 +1532,7 @@ def main() -> int:
     fig_b_src = build_supp_fig_b(exp4, metrics, names20, out)
     tab_b1, tab_b2 = build_supp_table_b(exp4, metrics, names20, out)
     tab_c = build_supp_table_c(exp4, names20, out)
+    tab_d_wide, tab_d_src = build_concept_consistency_table(exp4, names20, out)
 
     write_captions(out, concept_cluster_ids(exp4))
     sheets = {
@@ -1396,6 +1545,8 @@ def main() -> int:
         "TableB_part1": tab_b1,
         "TableB_part2": tab_b2,
         "TableC_keys": tab_c,
+        "TableD_concept_by_K": tab_d_wide,
+        "TableD_concept_by_K_source": tab_d_src,
     }
     write_source_data(out, sheets)
 
