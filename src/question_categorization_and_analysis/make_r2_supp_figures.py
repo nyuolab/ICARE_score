@@ -712,25 +712,87 @@ def build_exp4_metrics(exp4: Path) -> pd.DataFrame:
 
 
 
-def concept_cluster_ids(exp4: Path) -> Dict[int, Dict[str, int]]:
-    """K -> {concept: matched cluster_id} for highlight outlines."""
-    ct = pd.read_csv(exp4 / "model_seeds_all" / "concept_tracking.csv")
-    out: Dict[int, Dict[str, int]] = {}
+# Fig. 4 / K=20 IDs for the two tracked concepts
+CONCEPT_K20_IDS = {
+    "Lung Lobe Abnormality": 12,
+    "Calcified Granuloma Location": 13,
+}
+HIGHLIGHT_EDGEWIDTH = 1.2
+HIGHLIGHT_ZORDER = MARKER_ZORDER + 0.5
+TAG_ZORDER = LABEL_ZORDER + 1
+TAG_FONTSIZE = 15
+
+
+def k20_unique_cluster_sizes(exp4: Path) -> Dict[int, float]:
+    """Unique-question counts per K=20 cluster (correspondence unit)."""
+    p = exp4 / "model_seeds_all" / "clustered_questions_K20.csv"
+    df = pd.read_csv(p, usecols=["Question_Text", "cluster_id"])
+    sizes = (
+        df.drop_duplicates(subset=["Question_Text"])
+        .groupby("cluster_id")
+        .size()
+        .astype(float)
+        .to_dict()
+    )
+    return {int(k): float(v) for k, v in sizes.items()}
+
+
+def concept_match_info(exp4: Path) -> Dict[int, Dict[str, dict]]:
+    """Per K: best-matching new cluster for each tracked K=20 concept.
+
+    Matching uses existing correspondence matrices (forward share of the
+    concept's unique questions). Reverse share = fraction of the new
+    cluster that comes from that concept.
+    """
+    sizes20 = k20_unique_cluster_sizes(exp4)
+    out: Dict[int, Dict[str, dict]] = {}
     for k in KS_GRID:
+        mat = load_correspondence(exp4, k)
+        n_new = mat.shape[1]
+        size_new = np.zeros(n_new, dtype=float)
+        for oid in range(20):
+            size_new += mat[oid] * float(sizes20.get(oid, 0.0))
         out[k] = {}
-        for concept in CONCEPTS:
-            sub = ct[(ct.K == k) & (ct.concept == concept) & (ct.is_matched)]
-            if len(sub):
-                out[k][concept] = int(sub.cluster_id.iloc[0])
+        for concept, oid in CONCEPT_K20_IDS.items():
+            best = int(np.argmax(mat[oid]))
+            fwd = float(mat[oid, best])
+            denom = float(size_new[best])
+            rev = (
+                float(mat[oid, best] * float(sizes20.get(oid, 0.0)) / denom)
+                if denom > 0
+                else float("nan")
+            )
+            out[k][concept] = {
+                "cluster_id": best,
+                "forward": fwd,
+                "reverse": rev,
+            }
     return out
 
 
+def concept_cluster_ids(exp4: Path) -> Dict[int, Dict[str, int]]:
+    """K -> {concept: matched cluster_id} for captions / highlights."""
+    info = concept_match_info(exp4)
+    return {
+        k: {c: int(d["cluster_id"]) for c, d in concepts.items()}
+        for k, concepts in info.items()
+    }
 
+
+def concept_tag_for(k: int, concept: str, reverse: float) -> str:
+    """Short bold tag; CG* when the concept is a minority of its matched cluster."""
+    if concept == "Lung Lobe Abnormality":
+        return "LL"
+    if concept == "Calcified Granuloma Location":
+        if k == 10 or (np.isfinite(reverse) and reverse < 0.5):
+            return "CG*"
+        return "CG"
+    return ""
 
 
 def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str], out: Path) -> Dict[str, pd.DataFrame]:
     """5x3 grid; each panel uses Fig. 4 panel size and scatter style."""
-    concept_ids = concept_cluster_ids(exp4)
+    match_info = concept_match_info(exp4)
     scores_by_k = {k: load_scores(exp4, k) for k in KS_GRID}
 
     nrows, ncols = len(KS_GRID), len(MODEL_ORDER)
@@ -748,21 +810,42 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
         top=0.95,
         bottom=0.03,
     )
+    outline_handle = Line2D(
+        [0],
+        [0],
+        linestyle="None",
+        marker="o",
+        markersize=14,
+        markerfacecolor="none",
+        markeredgecolor="black",
+        markeredgewidth=HIGHLIGHT_EDGEWIDTH,
+        label=(
+            "Outlined: clusters containing most Lung Lobe Abnormality (LL) "
+            "or Calcified Granuloma Location (CG) questions"
+        ),
+    )
     fig.legend(
-        handles=colour_legend_handles(),
+        handles=colour_legend_handles() + [outline_handle],
         loc="upper center",
         bbox_to_anchor=(0.5, 0.995),
-        ncol=2,
+        ncol=3,
         frameon=True,
-        fontsize=16,
+        fontsize=14,
         handletextpad=0.5,
-        columnspacing=1.5,
+        columnspacing=1.2,
     )
     source_d = []
 
     for ri, k in enumerate(KS_GRID):
         sk = scores_by_k[k]
         name_map = load_names(exp4, k)
+        k_info = match_info.get(k, {})
+        id_to_tags: Dict[int, List[str]] = {}
+        for concept, info in k_info.items():
+            cid = int(info["cluster_id"])
+            tag = concept_tag_for(k, concept, float(info["reverse"]))
+            id_to_tags.setdefault(cid, []).append(tag)
+
         for ci, model in enumerate(MODEL_ORDER):
             ax = fig.add_subplot(gs[ri, ci])
             sub = sk[sk.Model == model].copy()
@@ -773,6 +856,36 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
             colors = [side_color(side_of_diagonal(g, e)) for g, e in zip(ys, xs)]
 
             scatter_fig4(ax, xs, ys, cnt, colors)
+            # Thin black outline + short tags on tracked-concept clusters only
+            for x, y, lab, n in zip(xs, ys, labs, cnt):
+                if int(lab) not in id_to_tags:
+                    continue
+                if not (np.isfinite(x) and np.isfinite(y)):
+                    continue
+                s = float(fig4_point_sizes([n])[0])
+                ax.scatter(
+                    [float(x)],
+                    [float(y)],
+                    s=[s],
+                    facecolors="none",
+                    edgecolors="black",
+                    linewidths=HIGHLIGHT_EDGEWIDTH,
+                    zorder=HIGHLIGHT_ZORDER,
+                )
+                tag = "/".join(id_to_tags[int(lab)])
+                ax.annotate(
+                    tag,
+                    (float(x), float(y)),
+                    xytext=(-18, -12),
+                    textcoords="offset points",
+                    fontsize=TAG_FONTSIZE,
+                    weight="bold",
+                    ha="right",
+                    va="top",
+                    color="black",
+                    zorder=TAG_ZORDER,
+                    clip_on=False,
+                )
             label_clusters_fig4(ax, xs, ys, labs)
             draw_fig4_diagonal(ax)
             style_fig4_axes(
@@ -799,8 +912,6 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                         weight="bold",
                         labelpad=15,
                     )
-            if ri == 0 and ci == 0:
-                panel_letter_fig4(ax, "a")
             add_correlation_box(ax, xs, ys)
 
             for _, r in sub.iterrows():
@@ -820,11 +931,12 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                         "highlight_concept": next(
                             (
                                 c
-                                for c, cid in concept_ids.get(k, {}).items()
-                                if cid == int(r.Cluster)
+                                for c, info in k_info.items()
+                                if int(info["cluster_id"]) == int(r.Cluster)
                             ),
                             "",
                         ),
+                        "highlight_tag": "/".join(id_to_tags.get(int(r.Cluster), [])),
                     }
                 )
 
@@ -1180,7 +1292,7 @@ For each cluster and model: ICARE-GT and ICARE-GEN as across-seed mean ± SD, an
 
 ## Supp Fig. B
 **Supplementary Figure B. ICARE cluster scores across the number of clusters K (Fig. 4–style grid).**  
-Each panel matches the submitted Fig. 4 scatter style. Rows: K = 10, 15, 20, 25, 30 (K=20 shaded and labelled Fig. 4); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Point size = GT question count / 30; colour encodes side of the diagonal.
+Each panel matches the submitted Fig. 4 scatter style. Rows: K = 10, 15, 20, 25, 30 (K=20 labelled Fig. 4); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Point size = GT question count / 30; colour encodes side of the diagonal. Outlined points are the clusters containing the largest share of Lung Lobe Abnormality (LL) or Calcified Granuloma Location (CG) questions from the K=20 partition; cluster-ID labels are retained. Cluster IDs are specific to each K; outlined clusters track two concepts from Fig. 4 across K. * CG* marks K = 10, where Calcified Granuloma Location questions are a minority (< 50%) of a broader merged cluster.
 
 Best-matching cluster IDs for the tracked concepts:
 {concept_block}
@@ -1192,6 +1304,8 @@ Part 1: for each K and model, counts and percentages of clusters below / above t
 ## Supp Table C
 **Supplementary Table C. Cluster keys for K = 10, 15, 25, 30.**  
 Cluster ID → best-matching K=20 cluster name and share. The K=20 name key is Fig. 4d.
+
+Cluster names for K ≠ 20 were generated with Llama 3.3 70B using the same prompt and nearest-centroid representatives as Fig. 4; K = 20 names are those of Fig. 4.
 """
     (out / "captions.md").write_text(text)
     print(f"Wrote {out / 'captions.md'}")

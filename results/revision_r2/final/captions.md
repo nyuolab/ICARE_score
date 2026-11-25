@@ -12,7 +12,7 @@ For each cluster and model: ICARE-GT and ICARE-GEN as across-seed mean ± SD, an
 
 ## Supp Fig. B
 **Supplementary Figure B. ICARE cluster scores across the number of clusters K (Fig. 4–style grid).**  
-Each panel matches the submitted Fig. 4 scatter style. Rows: K = 10, 15, 20, 25, 30 (K=20 shaded and labelled Fig. 4); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Point size = GT question count / 30; colour encodes side of the diagonal.
+Each panel matches the submitted Fig. 4 scatter style. Rows: K = 10, 15, 20, 25, 30 (K=20 labelled Fig. 4); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Point size = GT question count / 30; colour encodes side of the diagonal. Outlined points are the clusters containing the largest share of Lung Lobe Abnormality (LL) or Calcified Granuloma Location (CG) questions from the K=20 partition; cluster-ID labels are retained. Cluster IDs are specific to each K; outlined clusters track two concepts from Fig. 4 across K. * CG* marks K = 10, where Calcified Granuloma Location questions are a minority (< 50%) of a broader merged cluster.
 
 Best-matching cluster IDs for the tracked concepts:
 - K = 10: Lung Lobe Abnormality = cluster 5; Calcified Granuloma Location = cluster 3.
