@@ -10,6 +10,8 @@ The 153 RRG-Pref preference pairs were selected from IU-Xray model-pair ICARE su
 
 Manuscript Fig. 2a then keeps the **119** samples with ≥2-of-3 clinician consensus (34 one-each splits dropped). Metric-tie with a decisive clinician vote is counted as **misalignment** (same rule used here).
 
+Alignment-panel y-axis is 0–1.05 (Fig. 2a used 0–0.82); RadPref alignment exceeds 0.82 at large gaps.
+
 ## RadPref figure
 
 **Header:** RadPref: score gap vs clinician certainty
@@ -28,5 +30,5 @@ Manuscript Fig. 2a then keeps the **119** samples with ≥2-of-3 clinician conse
 
 ## Tie fractions (Exp 3 rows)
 
-- RadPref (300 case×rater rows): doctor-tie fraction = 0.23 (69/300); mean metric-tie fraction across metrics = 0.031.
-- ReXVal (1800 pair×rater rows): doctor-tie fraction = 0.544444 (980/1800); mean metric-tie fraction across metrics = 0.214333.
+- RadPref: doctor-tie 0.23, metric-tie 0.031 (n=3000 rows × 10 metrics counted separately in metric-tie aggregate).
+- ReXVal: doctor-tie 0.544444, metric-tie 0.214333 (n=18000).

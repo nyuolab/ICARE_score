@@ -292,7 +292,7 @@ def plot_triptych(trip: pd.DataFrame, header: str, stem: str) -> None:
     fig.subplots_adjust(left=0.06, right=0.98, top=0.78, bottom=0.28, wspace=0.34)
     panels = [
         ("indecision", 'Indecision Rate\n("Can\'t Say" / Tied Ratings)', (0.0, 1.05)),
-        ("alignment", "Doctor-Metric\nAlignment Rate\n(Doctor = Metric)", (0.0, 0.82)),
+        ("alignment", "Doctor-Metric\nAlignment Rate\n(Doctor = Metric)", (0.0, 1.05)),
         ("misalignment", "Doctor-Metric\nMisalignment Rate\n(Doctor ≠ Metric)", (0.0, 0.82)),
     ]
     present = [m for m in PLOT_ORDER if m in set(df["metric"])]
