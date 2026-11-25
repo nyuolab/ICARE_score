@@ -22,28 +22,22 @@ def make_llama_request(
 ) -> Optional[Dict[str, Any]]:
     """Make a request to the LLAMA API."""
     
-    auth = (Config.API_AUTH_HEADER_TYPE or "bearer").strip().lower()
-    if auth == "bearer":
+    if Config.API_AUTH_HEADER_TYPE == "bearer":
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-    elif auth in ("api-key", "apikey"):
-        # NYU Kong / LiteLLM gateways expect hyphenated api-key (not camelCase apiKey)
+    elif Config.API_AUTH_HEADER_TYPE == "api-key":
         headers = {
             "api-key": api_key,
             "Content-Type": "application/json"
         }
-    elif auth == "apikey_camel":
+    else:
         headers = {
             "apiKey": api_key,
             "accept": "application/json",
             "Content-Type": "application/json"
         }
-    else:
-        raise ValueError(
-            f"Unsupported RRGEVAL_API_AUTH_HEADER_TYPE: {Config.API_AUTH_HEADER_TYPE}"
-        )
     
     data = {
         "model": model,
