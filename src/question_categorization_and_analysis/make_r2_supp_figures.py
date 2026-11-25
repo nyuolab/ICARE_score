@@ -717,10 +717,15 @@ CONCEPT_K20_IDS = {
     "Lung Lobe Abnormality": 12,
     "Calcified Granuloma Location": 13,
 }
-HIGHLIGHT_EDGEWIDTH = 1.2
+HIGHLIGHT_EDGEWIDTH = 2.5
+HIGHLIGHT_HALO_COLOR = "#FFD54F"
+HIGHLIGHT_HALO_ALPHA = 0.6
+HIGHLIGHT_HALO_SCALE = 2.4  # area scale vs marker
+HALO_ZORDER = MARKER_ZORDER - 0.5
 HIGHLIGHT_ZORDER = MARKER_ZORDER + 0.5
 TAG_ZORDER = LABEL_ZORDER + 1
-TAG_FONTSIZE = 15
+TAG_FONTSIZE = 22  # match axis-label fontsize
+AXIS_LABEL_FONTSIZE = 22
 
 
 def k20_unique_cluster_sizes(exp4: Path) -> Dict[int, float]:
@@ -810,29 +815,42 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
         top=0.95,
         bottom=0.03,
     )
-    outline_handle = Line2D(
+    below_handle = Patch(
+        facecolor=COLOR_BELOW,
+        edgecolor=MARKER_EDGECOLOR,
+        linewidth=MARKER_EDGEWIDTH,
+        label="Below diagonal (ICARE-GT < ICARE-GEN)",
+    )
+    above_handle = Patch(
+        facecolor=COLOR_ABOVE,
+        edgecolor=MARKER_EDGECOLOR,
+        linewidth=MARKER_EDGEWIDTH,
+        label="Above diagonal (ICARE-GT > ICARE-GEN)",
+    )
+    halo_handle = Line2D(
         [0],
         [0],
         linestyle="None",
         marker="o",
-        markersize=14,
-        markerfacecolor="none",
+        markersize=16,
+        markerfacecolor=HIGHLIGHT_HALO_COLOR,
         markeredgecolor="black",
         markeredgewidth=HIGHLIGHT_EDGEWIDTH,
+        alpha=HIGHLIGHT_HALO_ALPHA,
         label=(
-            "Outlined: clusters containing most Lung Lobe Abnormality (LL) "
-            "or Calcified Granuloma Location (CG) questions"
+            "Tracked concept (LL = Lung Lobe Abnormality; "
+            "CG = Calcified Granuloma Location; * = merged into a broader cluster)"
         ),
     )
     fig.legend(
-        handles=colour_legend_handles() + [outline_handle],
+        handles=[below_handle, above_handle, halo_handle],
         loc="upper center",
         bbox_to_anchor=(0.5, 0.995),
         ncol=3,
         frameon=True,
-        fontsize=14,
+        fontsize=AXIS_LABEL_FONTSIZE,
         handletextpad=0.5,
-        columnspacing=1.2,
+        columnspacing=1.0,
     )
     source_d = []
 
@@ -856,13 +874,23 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
             colors = [side_color(side_of_diagonal(g, e)) for g, e in zip(ys, xs)]
 
             scatter_fig4(ax, xs, ys, cnt, colors)
-            # Thin black outline + short tags on tracked-concept clusters only
+            # Soft yellow halo behind marker + bold black outline; tags beside point
             for x, y, lab, n in zip(xs, ys, labs, cnt):
                 if int(lab) not in id_to_tags:
                     continue
                 if not (np.isfinite(x) and np.isfinite(y)):
                     continue
                 s = float(fig4_point_sizes([n])[0])
+                ax.scatter(
+                    [float(x)],
+                    [float(y)],
+                    s=[s * HIGHLIGHT_HALO_SCALE],
+                    c=[HIGHLIGHT_HALO_COLOR],
+                    alpha=HIGHLIGHT_HALO_ALPHA,
+                    edgecolors="none",
+                    linewidths=0,
+                    zorder=HALO_ZORDER,
+                )
                 ax.scatter(
                     [float(x)],
                     [float(y)],
@@ -876,12 +904,12 @@ def build_supp_fig_b(exp4: Path, metrics: pd.DataFrame, names20: Dict[int, str],
                 ax.annotate(
                     tag,
                     (float(x), float(y)),
-                    xytext=(-18, -12),
+                    xytext=(12, 0),
                     textcoords="offset points",
                     fontsize=TAG_FONTSIZE,
                     weight="bold",
-                    ha="right",
-                    va="top",
+                    ha="left",
+                    va="center",
                     color="black",
                     zorder=TAG_ZORDER,
                     clip_on=False,
@@ -1292,7 +1320,7 @@ For each cluster and model: ICARE-GT and ICARE-GEN as across-seed mean ± SD, an
 
 ## Supp Fig. B
 **Supplementary Figure B. ICARE cluster scores across the number of clusters K (Fig. 4–style grid).**  
-Each panel matches the submitted Fig. 4 scatter style. Rows: K = 10, 15, 20, 25, 30 (K=20 labelled Fig. 4); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Point size = GT question count / 30; colour encodes side of the diagonal. Outlined points are the clusters containing the largest share of Lung Lobe Abnormality (LL) or Calcified Granuloma Location (CG) questions from the K=20 partition; cluster-ID labels are retained. Cluster IDs are specific to each K; outlined clusters track two concepts from Fig. 4 across K. * CG* marks K = 10, where Calcified Granuloma Location questions are a minority (< 50%) of a broader merged cluster.
+Each panel matches the submitted Fig. 4 scatter style. Rows: K = 10, 15, 20, 25, 30 (K=20 labelled Fig. 4); columns: CheXpertPlus_MIMIC, CheXpertPlus_Chex_MIMIC, MAIRA2. Point size = GT question count / 30; colour encodes side of the diagonal. Tracked concepts were matched across K by shared questions: at each K, the highlighted cluster is the one containing the largest share of the questions in the corresponding K = 20 cluster (Fig. 4: cluster 12, Lung Lobe Abnormality; cluster 13, Calcified Granuloma Location). Cluster IDs are specific to each K.
 
 Best-matching cluster IDs for the tracked concepts:
 {concept_block}
