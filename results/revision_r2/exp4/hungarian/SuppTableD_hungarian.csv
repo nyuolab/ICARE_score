@@ -20,3 +20,11 @@ concept_id,concept_name,CheXpertPlus_MIMIC | K=10,CheXpertPlus_MIMIC | K=10 | as
 18,Lung Volume Condition,Below§,1,1.0,3369.0,0.18833855098389982,True,Below,3,3.0,3363.0,0.599679029957204,False,Below,18,18.0,3790.0,1.0,False,Below,16,16.0,2873.0,0.7433376455368693,False,75.8,Below,3,3.0,3446.0,0.8811045768345691,False,90.9,Below§,1,1.0,3369.0,0.18833855098389982,True,Below,3,3.0,3363.0,0.599679029957204,False,Below,18,18.0,3790.0,1.0,False,Below,16,16.0,2873.0,0.7433376455368693,False,75.8,Below,3,3.0,3446.0,0.8811045768345691,False,90.9,Below§,1,1.0,3369.0,0.18833855098389982,True,Below,3,3.0,3363.0,0.599679029957204,False,Below,18,18.0,3790.0,1.0,False,Below,16,16.0,2873.0,0.7433376455368693,False,75.8,Below,3,3.0,3446.0,0.8811045768345691,False,90.9
 19,Heart Abnormality Presence,Above,6,6.0,4446.0,0.5096286107290234,False,Above§,11,11.0,3335.0,0.433398310591293,True,Below,19,19.0,4839.0,1.0,False,Below,"13,24",13.0,3505.0,0.7077948303715671,False,97.6,Below,"24,26",26.0,3454.0,0.6977777777777778,False,96.5,Below,6,6.0,4446.0,0.5096286107290234,False,Above§,11,11.0,3335.0,0.433398310591293,True,Below,19,19.0,4839.0,1.0,False,Above,"13,24",13.0,3505.0,0.7077948303715671,False,72.4,Above,"24,26",26.0,3454.0,0.6977777777777778,False,71.4,Above,6,6.0,4446.0,0.5096286107290234,False,Above§,11,11.0,3335.0,0.433398310591293,True,Below,19,19.0,4839.0,1.0,False,Below,"13,24",13.0,3505.0,0.7077948303715671,False,72.4,Below,"24,26",26.0,3454.0,0.6977777777777778,False,71.4
 ,% same side as K=20,75%,,,,,,85%,,,,,,100%,,,,,,80%,,,,,,,95%,,,,,,,80%,,,,,,75%,,,,,,100%,,,,,,70%,,,,,,,80%,,,,,,,90%,,,,,,95%,,,,,,100%,,,,,,90%,,,,,,,90%,,,,,,
+
+# NOTES / symbol definitions for side cells in this CSV:
+# dagger (†) = n < 30: matched cluster has n_gt < 30 or n_gen < 30 (or existing Exp4 low_n flag).
+# double-dagger (‡) = both-low: ICARE-GT and ICARE-GEN are both < 0.3 for the matched cluster.
+# section (§) = weak-match: Jaccard of the reported assignment edge < 0.5.
+# asterisk (*) = not used in this Hungarian table (greedy Table D used * for merged/reverse share < 0.5).
+# Below = ICARE-GT < ICARE-GEN; Above = ICARE-GT > ICARE-GEN.
+# Boolean column '... | weak' is True iff the section mark applies (Jaccard < 0.5).

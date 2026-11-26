@@ -1,6 +1,6 @@
 # Supp Table D (Hungarian assignment)
 
-Sides from pooled Exp4 `scores_K*.csv` (Fig. 4 pooling). † = n_gt or n_gen < 30 (or existing `low_n`); ‡ = GT and GEN both < 0.3; § = weak match (Jaccard < 0.5).
+Sides from pooled Exp4 `scores_K*.csv` (Fig. 4 pooling). Cell marks † / ‡ / § are defined in **Footnotes** below.
 
 Finer K (25, 30): side of the **main** assigned cluster (largest overlap); `pct_same_side` = % of the K=20 concept’s unique questions in assigned K-clusters on the same side as that main cluster (not recomputed from pooled pieces).
 
@@ -103,3 +103,15 @@ Coarser K (10, 15): side of the assigned parent; siblings listed below.
 - parent 13 ← 13:Calcified Granuloma Location
 - parent 14 ← 9:Aortic Condition
 
+## Footnotes (symbol definitions)
+
+Every mark that can appear after a Below/Above cell in this table:
+
+| Symbol | Meaning |
+|---|---|
+| † | **n < 30**: the matched cluster has `n_gt < 30` or `n_gen < 30` (or the existing Exp4 `low_n` flag is true). |
+| ‡ | **both-low**: ICARE-GT **and** ICARE-GEN are both **< 0.3** for that matched cluster (same flag as Supp Table A ‡). |
+| § | **weak-match**: Jaccard overlap of the reported assignment edge (K=20 concept ↔ matched cluster) is **< 0.5**. |
+| * | **Not used** in this Hungarian table. (In the greedy Supp Table D, `*` meant merged / reverse share < 0.5; that mark is not applied here—weak matches use § instead.) |
+
+Side labels themselves: **Below** = ICARE-GT < ICARE-GEN (omission-dominated); **Above** = ICARE-GT > ICARE-GEN (hallucination-dominated).
